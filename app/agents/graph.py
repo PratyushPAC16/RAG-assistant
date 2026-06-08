@@ -118,17 +118,33 @@ def formatter_node(state: dict[str, Any]) -> dict[str, Any]:
     return _state_to_dict(agent_state)
 
 
-def _routing_decision(state: dict[str, Any]) -> str:
+def synthesizer_node(state: dict[str, Any]) -> dict[str, Any]:
     """
-    LangGraph conditional edge: return next node name based on ``agent_type``.
+    LangGraph node: synthesize responses from the gathered contexts.
+    """
+    agent_state = _dict_to_state(state)
+    from app.agents.synthesizer import get_synthesizer
+    synth = get_synthesizer()
+    updated = synth.run(agent_state)
+    return _state_to_dict(updated)
+
+
+def _routing_decision(state: dict[str, Any]) -> list[str]:
+    """
+    LangGraph conditional edge: return next node name(s) based on ``agent_type``.
+    Supports parallel branching for hybrid queries.
     """
     agent_type_val = state.get("agent_type")
+
+    if agent_type_val == AgentType.HYBRID.value:
+        return ["rag_node", "web_node"]
+
     mapping = {
-        AgentType.RAG.value: "rag_node",
-        AgentType.WEB.value: "web_node",
-        AgentType.MEMORY.value: "memory_node",
+        AgentType.RAG.value: ["rag_node"],
+        AgentType.WEB.value: ["web_node"],
+        AgentType.MEMORY.value: ["memory_node"],
     }
-    return mapping.get(agent_type_val or "", "rag_node")
+    return mapping.get(agent_type_val or "", ["rag_node"])
 
 
 # ── Graph construction ─────────────────────────────────────────────────────────
@@ -147,7 +163,9 @@ def build_graph() -> Any:
      rag_node    web_node   memory_node
        └──┬──────────┴────────────┘
           │
-        formatter_node       (cleans up response)
+     synthesizer_node        (runs LLM response synthesis)
+          │
+     formatter_node          (cleans up response)
           │
          END
 
@@ -161,6 +179,7 @@ def build_graph() -> Any:
     graph.add_node("rag_node", rag_node)
     graph.add_node("web_node", web_node)
     graph.add_node("memory_node", memory_node)
+    graph.add_node("synthesizer_node", synthesizer_node)
     graph.add_node("formatter_node", formatter_node)
 
     # ── Entry edge ─────────────────────────────────────────────────────────────
@@ -177,12 +196,13 @@ def build_graph() -> Any:
         },
     )
 
-    # ── Convergence edges → formatter ──────────────────────────────────────────
-    graph.add_edge("rag_node", "formatter_node")
-    graph.add_edge("web_node", "formatter_node")
-    graph.add_edge("memory_node", "formatter_node")
+    # ── Convergence edges → synthesizer ────────────────────────────────────────
+    graph.add_edge("rag_node", "synthesizer_node")
+    graph.add_edge("web_node", "synthesizer_node")
+    graph.add_edge("memory_node", "synthesizer_node")
 
-    # ── Terminal edge ──────────────────────────────────────────────────────────
+    # ── Terminal edges ─────────────────────────────────────────────────────────
+    graph.add_edge("synthesizer_node", "formatter_node")
     graph.add_edge("formatter_node", END)
 
     return graph.compile()
@@ -294,9 +314,12 @@ graph TD
     router_node -->|RAG| rag_node[RAG Agent]
     router_node -->|Web| web_node[Web Search Agent]
     router_node -->|Memory| memory_node[Memory Agent]
-    rag_node --> formatter_node[Response Formatter]
-    web_node --> formatter_node
-    memory_node --> formatter_node
+    router_node -->|Hybrid| rag_node
+    router_node -->|Hybrid| web_node
+    rag_node --> synthesizer_node[Response Synthesizer]
+    web_node --> synthesizer_node
+    memory_node --> synthesizer_node
+    synthesizer_node --> formatter_node[Response Formatter]
     formatter_node --> END([END])
 """
 

@@ -31,9 +31,11 @@ Available agents:
 1. "rag"    — For questions about uploaded documents, knowledge base, reports, data, PDFs.
 2. "web"    — For questions requiring current/real-time information, news, recent events, prices, or facts not in documents.
 3. "memory" — For follow-up questions, clarifications about previous answers, or references to "earlier", "before", "last time", etc.
+4. "hybrid" — For complex queries that compare, combine, or contrast facts in the user's uploaded documents with current web trends/information.
 
 Decision rules:
-- If the query references "the document", "the report", "the file", "in the data" → "rag"
+- If the query references "the document", "the report", "the file", "in the data" AND asks about current/trends/external context → "hybrid"
+- If the query references "the document", "the report", "the file", "in the data" only → "rag"
 - If the query asks about "latest", "current", "today", "news", "recent" → "web"
 - If the query uses "you said", "earlier", "before", "the previous answer", "continue" → "memory"
 - If the vector store is empty (no documents indexed), prefer "web" over "rag"
@@ -41,7 +43,7 @@ Decision rules:
 
 Respond ONLY with a JSON object in this exact format:
 {
-  "agent": "<rag|web|memory>",
+  "agent": "<rag|web|memory|hybrid>",
   "reasoning": "<one sentence explaining the routing decision>",
   "confidence": <0.0-1.0>
 }"""
@@ -62,7 +64,7 @@ class RouterAgent:
     dispatch them to the correct downstream agent.
 
     The router considers:
-    1. Query intent (document, web, memory).
+    1. Query intent (document, web, memory, hybrid).
     2. Whether the vector store has indexed documents.
     3. Whether there is active conversation history.
 
@@ -144,6 +146,7 @@ class RouterAgent:
             AgentType.RAG: "rag_node",
             AgentType.WEB: "web_node",
             AgentType.MEMORY: "memory_node",
+            AgentType.HYBRID: "hybrid_route",  # Handled in conditional routing
         }
         agent = state.agent_type or AgentType.RAG
         return mapping.get(agent, "rag_node")
@@ -158,7 +161,7 @@ class RouterAgent:
         history_preview: str,
     ) -> AgentType:
         """
-        Use Gemini to classify the query as rag / web / memory.
+        Use Gemini to classify the query as rag / web / memory / hybrid.
         Falls back to rule-based routing if LLM output cannot be parsed.
         """
         prompt = _ROUTER_PROMPT_TEMPLATE.format(
@@ -208,7 +211,12 @@ class RouterAgent:
             if confidence < 0.6 and num_docs == 0:
                 return AgentType.WEB
 
-            mapping = {"rag": AgentType.RAG, "web": AgentType.WEB, "memory": AgentType.MEMORY}
+            mapping = {
+                "rag": AgentType.RAG,
+                "web": AgentType.WEB,
+                "memory": AgentType.MEMORY,
+                "hybrid": AgentType.HYBRID,
+            }
             return mapping.get(agent_str, AgentType.RAG)
 
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
@@ -226,11 +234,17 @@ class RouterAgent:
         q_lower = query.lower()
 
         memory_keywords = {"earlier", "before", "previous", "you said", "last time", "continue"}
-        web_keywords = {"latest", "current", "today", "news", "recent", "2024", "2025", "live"}
+        web_keywords = {"latest", "current", "today", "news", "recent", "2024", "2025", "live", "trends", "trend", "hiring"}
+        doc_keywords = {"document", "report", "file", "data", "resume", "pdf", "cv"}
+
+        has_doc_kw = any(kw in q_lower for kw in doc_keywords)
+        has_web_kw = any(kw in q_lower for kw in web_keywords)
 
         if has_history and any(kw in q_lower for kw in memory_keywords):
             return AgentType.MEMORY
-        if any(kw in q_lower for kw in web_keywords):
+        if has_doc_kw and has_web_kw and num_docs > 0:
+            return AgentType.HYBRID
+        if has_web_kw:
             return AgentType.WEB
         return AgentType.RAG if num_docs > 0 else AgentType.WEB
 

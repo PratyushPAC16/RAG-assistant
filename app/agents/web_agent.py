@@ -77,8 +77,7 @@ class WebSearchAgent:
             state: Current :class:`~app.models.schemas.AgentState`.
 
         Returns:
-            Updated state with ``answer``, ``sources``, ``web_results``,
-            and ``agent_type`` set.
+            Updated state with ``web_results`` and ``agent_type`` set.
         """
         query = state.query
         logger.info("WebSearchAgent.run called", extra={"query": query[:80]})
@@ -89,28 +88,6 @@ class WebSearchAgent:
                 raw_results = self._search(query)
             state.web_results = raw_results
             state.latency_ms["web_search"] = search_ctx.get("latency_ms", 0.0)
-
-            if not raw_results:
-                state.answer = (
-                    "No relevant web results were found for your query. "
-                    "Please try rephrasing or ask about something within the uploaded documents."
-                )
-                state.sources = []
-                state.agent_type = AgentType.WEB
-                return state
-
-            # ── Step 2: Format results for prompt ─────────────────────────────
-            formatted = self._format_results(raw_results)
-            history = self._format_history(state)
-
-            # ── Step 3: LLM summarisation ──────────────────────────────────────
-            with log_latency(logger, "web_summarisation") as llm_ctx:
-                answer = self._summarise(query, formatted, history)
-            state.latency_ms["llm"] = llm_ctx.get("latency_ms", 0.0)
-
-            # ── Step 4: Citations ──────────────────────────────────────────────
-            state.answer = answer
-            state.sources = self._build_citations(raw_results)
             state.agent_type = AgentType.WEB
 
         except Exception as exc:
@@ -120,10 +97,6 @@ class WebSearchAgent:
                 exc_info=True,
             )
             state.error = str(exc)
-            state.answer = (
-                f"Web search encountered an error: {exc}\n"
-                "Please check your TAVILY_API_KEY or try again later."
-            )
 
         return state
 

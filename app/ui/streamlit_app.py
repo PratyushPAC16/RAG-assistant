@@ -96,6 +96,7 @@ st.markdown(
     .agent-badge-rag  { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
     .agent-badge-web  { background: #1e3a5f; color: #7dd3fc; border: 1px solid #0284c7; }
     .agent-badge-memory { background: #4a1942; color: #f0abfc; border: 1px solid #a855f7; }
+    .agent-badge-hybrid { background: #5b21b6; color: #ddd6fe; border: 1px solid #7c3aed; }
     .agent-badge {
         border-radius: 8px; padding: 2px 10px;
         font-size: 0.72rem; font-weight: 600;
@@ -433,9 +434,12 @@ def render_chat() -> None:
             else:
                 agent = turn.get("agent", "rag")
                 badge_class = f"agent-badge-{agent}"
-                badge_label = {"rag": "📚 RAG", "web": "🌐 Web", "memory": "🧠 Memory"}.get(
-                    agent, "🤖 AI"
-                )
+                badge_label = {
+                    "rag": "📚 RAG",
+                    "web": "🌐 Web",
+                    "memory": "🧠 Memory",
+                    "hybrid": "🔀 Hybrid (RAG + Web Search)"
+                }.get(agent, "🤖 AI")
                 # Header badge + latency
                 st.markdown(
                     f"""

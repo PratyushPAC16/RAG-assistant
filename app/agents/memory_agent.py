@@ -75,14 +75,13 @@ class MemoryAgent:
 
     def run(self, state: AgentState) -> AgentState:
         """
-        Answer the query using conversation history.
+        Prepare conversation history from session memory.
 
         Args:
             state: Current :class:`~app.models.schemas.AgentState`.
 
         Returns:
-            Updated state with ``answer``, ``sources`` (empty for memory),
-            and ``agent_type`` set to MEMORY.
+            Updated state with ``conversation_history`` and ``agent_type`` set to MEMORY.
         """
         query = state.query
         session_id = state.session_id
@@ -97,16 +96,7 @@ class MemoryAgent:
 
             # ── Build history from both agent state and session memory ─────────
             all_messages = self._merge_history(state, memory)
-            formatted_history = self._format_history(all_messages)
-
-            # ── Generate answer ────────────────────────────────────────────────
-            with log_latency(logger, "memory_agent_generation") as llm_ctx:
-                answer = self._generate_answer(query, formatted_history)
-            state.latency_ms["llm"] = llm_ctx.get("latency_ms", 0.0)
-
-            # ── Update state ───────────────────────────────────────────────────
-            state.answer = answer
-            state.sources = []  # Memory answers don't have document sources
+            state.conversation_history = all_messages
             state.agent_type = AgentType.MEMORY
 
         except Exception as exc:
@@ -116,10 +106,6 @@ class MemoryAgent:
                 exc_info=True,
             )
             state.error = str(exc)
-            state.answer = (
-                f"Memory agent encountered an error: {exc}\n"
-                "Please try rephrasing your question."
-            )
 
         return state
 

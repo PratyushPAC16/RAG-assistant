@@ -89,17 +89,13 @@ class RAGAgent:
 
     def run(self, state: AgentState) -> AgentState:
         """
-        Execute the RAG pipeline and update the agent state.
-
-        This method is designed to be used as a LangGraph node:
-        it accepts a state dict-like object and returns an updated state.
+        Execute the retrieval and reranking pipeline and update the agent state.
 
         Args:
             state: Current :class:`~app.models.schemas.AgentState`.
 
         Returns:
-            Updated state with ``answer``, ``sources``, ``retrieved_chunks``,
-            ``reranked_chunks``, ``context``, and ``agent_type`` populated.
+            Updated state with ``retrieved_chunks`` and ``reranked_chunks`` populated.
         """
         query = state.query
         logger.info("RAGAgent.run called", extra={"query": query[:80]})
@@ -114,11 +110,7 @@ class RAGAgent:
             state.latency_ms["retrieval"] = retrieval_ctx.get("latency_ms", 0.0)
 
             if not chunks:
-                state.answer = (
-                    "No relevant documents were found in the knowledge base. "
-                    "Please upload documents first or rephrase your query."
-                )
-                state.sources = []
+                state.reranked_chunks = []
                 state.agent_type = AgentType.RAG
                 return state
 
@@ -131,22 +123,6 @@ class RAGAgent:
                 )
             state.reranked_chunks = reranked
             state.latency_ms["reranking"] = rerank_ctx.get("latency_ms", 0.0)
-
-            # ── Step 3: Context assembly ───────────────────────────────────────
-            context = self._build_context(reranked)
-            state.context = context
-
-            # ── Step 4: Conversation history ───────────────────────────────────
-            history = self._format_history(state)
-
-            # ── Step 5: LLM generation ─────────────────────────────────────────
-            with log_latency(logger, "rag_llm_generation") as llm_ctx:
-                answer = self._generate_answer(query, context, history)
-            state.latency_ms["llm"] = llm_ctx.get("latency_ms", 0.0)
-
-            # ── Step 6: Citations ──────────────────────────────────────────────
-            state.answer = answer
-            state.sources = self._extract_citations(reranked)
             state.agent_type = AgentType.RAG
 
         except Exception as exc:
@@ -157,33 +133,6 @@ class RAGAgent:
                 exc_info=True,
             )
             state.error = error_str
-
-            # ── Friendly quota / rate-limit messages ───────────────────────────
-            if "429" in error_str or "quota" in error_str.lower() or "rate" in error_str.lower():
-                if "limit: 0" in error_str or "free_tier" in error_str:
-                    state.answer = (
-                        "🚫 **Google API Quota Exhausted**\n\n"
-                        "Your Google Cloud project's free-tier quota for this model has reached its **limit of 0**.\n\n"
-                        "**To fix this:**\n"
-                        "1. Go to [Google AI Studio](https://aistudio.google.com) and create a **new project** with a fresh API key.\n"
-                        "2. Or enable **billing** on your current Google Cloud project at [console.cloud.google.com](https://console.cloud.google.com).\n"
-                        "3. Update `GOOGLE_API_KEY` in your `.env` file, then restart the server.\n\n"
-                        "_Note: Getting a new key from the same exhausted project will not help — you need a new project or billing enabled._"
-                    )
-                else:
-                    # Temporary rate limit — may have a retry-after hint
-                    retry_match = re.search(r"retry in ([\d.]+)s", error_str, re.IGNORECASE)
-                    retry_hint = f" Please wait **{retry_match.group(1)} seconds** and try again." if retry_match else " Please try again in a few minutes."
-                    state.answer = (
-                        f"⏳ **Rate Limit Reached**\n\n"
-                        f"The Google Gemini API has temporarily rate-limited your requests.{retry_hint}\n\n"
-                        "If this keeps happening, consider switching to a paid API tier."
-                    )
-            else:
-                state.answer = (
-                    f"An error occurred while processing your query: {exc}\n"
-                    "Please try again or contact support."
-                )
 
         return state
 

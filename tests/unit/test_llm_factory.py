@@ -94,3 +94,43 @@ def test_embedding_service_initialization(mock_settings) -> None:
         assert svc.model_name == mock_settings.ollama_embedding_model
         assert svc._client == mock_embeddings
         assert svc._query_client == mock_embeddings
+
+
+def test_response_synthesizer_run(mock_settings) -> None:
+    from app.agents.synthesizer import ResponseSynthesizer
+    from app.models.schemas import AgentState, RetrievedChunk, ChunkMetadata
+    
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value.content = "Synthesized response [Source: report.pdf, Page 2] [Source: https://google.com]"
+    
+    with (
+        patch("app.agents.synthesizer.settings", mock_settings),
+        patch("app.agents.synthesizer.get_llm", return_value=mock_llm),
+    ):
+        synthesizer = ResponseSynthesizer()
+        
+        chunk = RetrievedChunk(
+            chunk_id="chunk1",
+            content="Document content",
+            metadata=ChunkMetadata(
+                source="report.pdf",
+                page=2,
+                document_id="doc123"
+            ),
+            rerank_score=0.95
+        )
+        
+        state = AgentState(
+            query="Compare doc with google",
+            reranked_chunks=[chunk],
+            web_results=[{"title": "Google", "url": "https://google.com", "content": "Web info"}]
+        )
+        
+        result = synthesizer.run(state)
+        
+        assert "Synthesized response" in result.answer
+        assert len(result.sources) == 2
+        assert result.sources[0].document == "report.pdf"
+        assert result.sources[0].page == 2
+        assert result.sources[1].document == "Google"
+        assert result.sources[1].chunk_id == "https://google.com"
