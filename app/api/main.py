@@ -80,6 +80,64 @@ def _persist_metric(metric: RetrievalMetric) -> None:
         logger.error(f"Failed to persist metric: {exc}", exc_info=True)
 
 
+def _rebuild_document_registry() -> None:
+    """Rebuild in-memory registry of documents from ChromaDB collections."""
+    global _document_registry
+    try:
+        vector_store = get_vector_store()
+        metadatas = vector_store.get_all_documents_metadata()
+        
+        # Group chunks by document_id
+        doc_chunks = {}
+        for meta in metadatas:
+            doc_id = meta.get("document_id")
+            if doc_id:
+                if doc_id not in doc_chunks:
+                    doc_chunks[doc_id] = []
+                doc_chunks[doc_id].append(meta)
+                
+        # Rebuild records
+        from datetime import datetime
+        for doc_id, chunks in doc_chunks.items():
+            rep = chunks[0]
+            filename = rep.get("document_name") or rep.get("source") or "unknown"
+            
+            pages = set()
+            for c in chunks:
+                p = c.get("page")
+                if p:
+                    pages.add(p)
+            num_pages = len(pages) if pages else None
+            
+            # Infer file type from extension
+            ext = Path(filename).suffix.lower().lstrip(".")
+            file_type = FileType.TXT
+            if ext == "pdf":
+                file_type = FileType.PDF
+            elif ext == "docx":
+                file_type = FileType.DOCX
+                
+            # Get file size if file exists on disk
+            file_size = 0
+            save_path = settings.data_path / f"{doc_id}_{filename}"
+            if save_path.exists():
+                file_size = save_path.stat().st_size
+                
+            _document_registry[doc_id] = DocumentRecord(
+                document_id=doc_id,
+                filename=filename,
+                file_type=file_type,
+                status=DocumentStatus.INDEXED,
+                num_chunks=len(chunks),
+                num_pages=num_pages,
+                file_size_bytes=file_size,
+                created_at=datetime.utcnow(),
+            )
+        logger.info(f"Rebuilt document registry with {len(_document_registry)} documents from ChromaDB")
+    except Exception as exc:
+        logger.error(f"Failed to rebuild document registry from ChromaDB: {exc}", exc_info=True)
+
+
 # ── Application lifespan ───────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -95,6 +153,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Warm up singletons on startup to avoid first-request latency
     _ = get_vector_store()
+    _rebuild_document_registry()
     _ = get_retriever()
     _ = get_orchestrator()
 
@@ -321,6 +380,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             query=request.query,
             session_id=session_id,
             use_web_search=request.use_web_search,
+            filter_document_ids=request.filter_document_ids,
         )
 
         # ── Log detailed retrieval analytics metric ────────────────────────────
@@ -489,6 +549,91 @@ async def delete_document(document_id: str) -> DeleteDocumentResponse:
         )
 
 
+@app.post(
+    "/documents/{document_id}/reindex",
+    response_model=UploadResponse,
+    tags=["Documents"],
+    summary="Reindex an existing document",
+)
+async def reindex_document(document_id: str) -> UploadResponse:
+    """
+    Delete and re-index a document using its saved source file on disk.
+    This parses the file and re-adds its text chunks into ChromaDB.
+    """
+    if document_id not in _document_registry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document '{document_id}' not found.",
+        )
+
+    record = _document_registry[document_id]
+    filename = record.filename
+    save_path = settings.data_path / f"{document_id}_{filename}"
+
+    if not save_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Source file for '{filename}' is missing on disk.",
+        )
+
+    record.status = DocumentStatus.PROCESSING
+    try:
+        # Delete from vector store first
+        vector_store = get_vector_store()
+        vector_store.delete_by_document_id(document_id)
+
+        # Reprocess and index
+        processor = DocumentProcessor()
+        documents, chunk_metas = processor.process(
+            path=save_path, document_id=document_id
+        )
+
+        vector_store.add_documents(documents, chunk_metas)
+
+        # Refresh BM25 index after reindexing
+        retriever = get_retriever()
+        retriever.refresh_bm25_index()
+
+        # Update registry record
+        from datetime import datetime
+        num_pages = max((m.page or 1) for m in chunk_metas) if chunk_metas else None
+        record.status = DocumentStatus.INDEXED
+        record.num_chunks = len(documents)
+        record.num_pages = num_pages
+        record.indexed_at = datetime.utcnow()
+
+        logger.info(
+            "Document reindexed",
+            extra={
+                "file_name": filename,
+                "document_id": document_id,
+                "num_chunks": len(documents),
+            },
+        )
+
+        return UploadResponse(
+            document_id=document_id,
+            filename=filename,
+            num_chunks=len(documents),
+            num_pages=num_pages,
+            status=DocumentStatus.INDEXED,
+            message=f"Successfully reindexed {len(documents)} chunks from '{filename}'.",
+        )
+
+    except Exception as exc:
+        record.status = DocumentStatus.FAILED
+        record.error_message = str(exc)
+        logger.error(
+            "Document reindexing failed",
+            extra={"file_name": filename, "error": str(exc)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reprocess document: {exc}",
+        )
+
+
 # ── Analytics endpoint ─────────────────────────────────────────────────────────
 
 @app.get(
@@ -568,6 +713,12 @@ async def get_analytics() -> dict:
     avg_total_tokens = total_tokens / total_queries
     avg_cost = total_cost / total_queries
 
+    # Document chunk distribution
+    doc_chunk_dist = {
+        doc_rec.filename: doc_rec.num_chunks
+        for doc_rec in _document_registry.values()
+    }
+
     return {
         "total_queries": total_queries,
         "queries_today": queries_today,
@@ -596,6 +747,7 @@ async def get_analytics() -> dict:
         # ── Distribution ─────────────────────────────────────────
         "agent_distribution": agent_counts,
         "top_sources": sorted(source_freq.items(), key=lambda x: x[1], reverse=True)[:10],
+        "document_chunk_distribution": doc_chunk_dist,
         "recent_metrics": [m.model_dump() for m in _retrieval_metrics[-20:]],
         "daily_trend": daily_trend,
     }

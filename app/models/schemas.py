@@ -49,9 +49,11 @@ class ChunkMetadata(BaseModel):
     """Metadata attached to every text chunk stored in the vector database."""
 
     source: str = Field(..., description="Original filename, e.g. 'report.pdf'")
+    document_name: str = Field(default="", description="Original filename, e.g. 'report.pdf'")
     page: int | None = Field(
         default=None, ge=1, description="1-indexed page number (None for TXT files)"
     )
+    file_type: str = Field(default="", description="File format: pdf, docx, txt")
     chunk_id: str = Field(
         default_factory=lambda: f"chunk_{uuid4().hex[:12]}",
         description="Unique chunk identifier",
@@ -247,6 +249,7 @@ class AgentState(BaseModel):
     completion_tokens: int = Field(default=0, description="Sum of completion tokens used across LLM calls")
     total_tokens: int = Field(default=0, description="Sum of total tokens used across LLM calls")
     cost_usd: float = Field(default=0.0, description="Estimated cost of LLM calls in USD")
+    filter_document_ids: list[str] | None = Field(default=None, description="Optional list of document IDs to restrict retrieval")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -275,6 +278,10 @@ class ChatRequest(BaseModel):
     use_web_search: bool = Field(
         default=True,
         description="Allow the router to trigger web search when documents are insufficient",
+    )
+    filter_document_ids: list[str] | None = Field(
+        default=None,
+        description="Optional list of document IDs to restrict search",
     )
 
     @field_validator("query", mode="before")

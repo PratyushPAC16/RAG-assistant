@@ -357,39 +357,47 @@ def render_dashboard() -> None:
         return
 
     docs = docs_resp["documents"]
-    df = pd.DataFrame(
-        [
-            {
-                "Document": d["filename"],
-                "Type": d["file_type"].upper(),
-                "Chunks": d["num_chunks"],
-                "Pages": d.get("num_pages", "—"),
-                "Size (KB)": round(d["file_size_bytes"] / 1024, 1),
-                "Status": d["status"],
-                "Indexed At": (
-                    d["indexed_at"][:16].replace("T", " ") if d.get("indexed_at") else "—"
-                ),
-                "ID": d["document_id"],
-            }
-            for d in docs
-        ]
-    )
 
-    st.dataframe(
-        df.drop(columns=["ID"]),
-        use_container_width=True,
-        hide_index=True,
-    )
+    # Table Header
+    h_col1, h_col2, h_col3, h_col4, h_col5, h_col6 = st.columns([3, 1, 1, 1, 1.5, 1.5])
+    h_col1.markdown("**Filename**")
+    h_col2.markdown("**Type**")
+    h_col3.markdown("**Chunks**")
+    h_col4.markdown("**Pages**")
+    h_col5.markdown("**Size**")
+    h_col6.markdown("**Actions**")
+    st.markdown("<hr style='margin: 4px 0; border-color: #334155 !important;' />", unsafe_allow_html=True)
 
-    # Delete controls
-    with st.expander("🗑️ Delete a Document"):
-        doc_options = {d["filename"]: d["document_id"] for d in docs}
-        selected_doc = st.selectbox("Select document to delete", list(doc_options.keys()))
-        if st.button("Delete", type="secondary"):
-            doc_id = doc_options[selected_doc]
-            result = api_delete(f"/documents/{doc_id}")
+    # Table Rows
+    for d in docs:
+        doc_id = d["document_id"]
+        filename = d["filename"]
+        file_type = d["file_type"].upper()
+        chunks = d["num_chunks"]
+        pages = d.get("num_pages") or "—"
+        size_kb = f"{round(d['file_size_bytes'] / 1024, 1)} KB"
+
+        row_col1, row_col2, row_col3, row_col4, row_col5, row_col6 = st.columns([3, 1, 1, 1, 1.5, 1.5])
+        row_col1.write(filename)
+        row_col2.write(file_type)
+        row_col3.write(str(chunks))
+        row_col4.write(str(pages))
+        row_col5.write(size_kb)
+
+        # Action buttons
+        btn_col1, btn_col2 = row_col6.columns(2)
+        if btn_col1.button("🔄", key=f"reindex_{doc_id}", help=f"Reindex {filename}"):
+            with st.spinner("Reindexing…"):
+                result = api_post(f"/documents/{doc_id}/reindex", timeout=300.0)
             if result:
-                st.success(f"✅ Deleted '{selected_doc}' ({result['chunks_deleted']} chunks removed)")
+                st.success(f"✅ Reindexed '{filename}'")
+                st.rerun()
+
+        if btn_col2.button("🗑️", key=f"delete_{doc_id}", help=f"Delete {filename}"):
+            with st.spinner("Deleting…"):
+                result = api_delete(f"/documents/{doc_id}")
+            if result:
+                st.success(f"✅ Deleted '{filename}'")
                 st.rerun()
 
 
@@ -402,12 +410,32 @@ def render_chat() -> None:
     )
 
     # Settings bar
-    with st.expander("⚙️ Chat Settings", expanded=False):
-        use_web = st.toggle("Allow Web Search", value=True)
-        st.caption(
-            "When enabled, the router may use Tavily web search "
-            "for queries requiring current information."
-        )
+    with st.expander("⚙️ Chat Settings & Document Filters", expanded=False):
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            use_web = st.toggle("Allow Web Search", value=True)
+            st.caption(
+                "When enabled, the router may use Tavily web search "
+                "for queries requiring current information."
+            )
+        with col_s2:
+            # Load documents list for filtering
+            docs_resp = api_get("/documents")
+            doc_options = {}
+            if docs_resp and docs_resp.get("documents"):
+                doc_options = {d["filename"]: d["document_id"] for d in docs_resp["documents"]}
+            
+            if doc_options:
+                selected_filenames = st.multiselect(
+                    "Filter Search to Specific Documents",
+                    options=list(doc_options.keys()),
+                    default=[],
+                    placeholder="Search all (Entire knowledge base)",
+                )
+                filter_ids = [doc_options[name] for name in selected_filenames]
+            else:
+                st.caption("No documents indexed yet to filter.")
+                filter_ids = None
 
     # ── Chat history ───────────────────────────────────────────────────────────
     chat_container = st.container()
@@ -515,6 +543,7 @@ def render_chat() -> None:
                 "query": query,
                 "session_id": st.session_state.session_id,
                 "use_web_search": use_web,
+                "filter_document_ids": filter_ids if 'filter_ids' in locals() and filter_ids else None,
             }
             result = api_post("/chat", json=payload, timeout=120.0)
 
@@ -887,28 +916,51 @@ def render_analytics() -> None:
 
     st.divider()
 
-    # ── Row 7: Top sources ────────────────────────────────────────────────────
-    top_src = data.get("top_sources", [])
-    if top_src:
-        st.markdown("#### 📚 Top Sources Used")
-        src_df = pd.DataFrame(top_src, columns=["Source", "Count"])
-        fig_src = px.bar(
-            src_df,
-            x="Count",
-            y="Source",
-            orientation="h",
-            title="Most Referenced Sources",
-            color="Count",
-            color_continuous_scale="Blues",
-        )
-        fig_src.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font_color="#e2e8f0",
-            showlegend=False,
-            yaxis={"categoryorder": "total ascending"},
-        )
-        st.plotly_chart(fig_src, use_container_width=True)
+    # ── Row 7: Storage breakdown & Top referenced sources ──
+    col_st1, col_st2 = st.columns(2, gap="large")
+    
+    with col_st1:
+        doc_chunk_dist = data.get("document_chunk_distribution", {})
+        if doc_chunk_dist:
+            st.markdown("#### 📁 Document Chunk Distribution")
+            fig_chunks = px.pie(
+                names=list(doc_chunk_dist.keys()),
+                values=list(doc_chunk_dist.values()),
+                title="Proportion of Chunks in Vector Store",
+                color_discrete_sequence=px.colors.qualitative.Safe,
+                hole=0.5,
+            )
+            fig_chunks.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0",
+                margin=dict(l=0, r=0, t=40, b=0),
+            )
+            st.plotly_chart(fig_chunks, use_container_width=True)
+            
+    with col_st2:
+        top_src = data.get("top_sources", [])
+        if top_src:
+            st.markdown("#### 📚 Top Referenced Sources")
+            src_df = pd.DataFrame(top_src, columns=["Source", "Count"])
+            fig_src = px.bar(
+                src_df,
+                x="Count",
+                y="Source",
+                orientation="h",
+                title="Most Referenced Sources in Answers",
+                color="Count",
+                color_continuous_scale="Blues",
+            )
+            fig_src.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0",
+                showlegend=False,
+                yaxis={"categoryorder": "total ascending"},
+                margin=dict(l=0, r=0, t=40, b=0),
+            )
+            st.plotly_chart(fig_src, use_container_width=True)
 
 
 

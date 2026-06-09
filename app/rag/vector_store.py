@@ -182,6 +182,7 @@ class VectorStore:
         query: str,
         top_k: int | None = None,
         filter_document_id: str | None = None,
+        filter_document_ids: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         """
         Perform semantic (cosine) search against the collection.
@@ -190,6 +191,7 @@ class VectorStore:
             query:              The search query string.
             top_k:              Number of results to return (default from settings).
             filter_document_id: If provided, restrict search to a single document.
+            filter_document_ids: If provided, restrict search to a set of documents.
 
         Returns:
             List of :class:`~app.models.schemas.RetrievedChunk` objects sorted by
@@ -198,8 +200,18 @@ class VectorStore:
         k = top_k or settings.retrieval_top_k
 
         where: dict[str, Any] | None = None
+        doc_ids = []
         if filter_document_id:
-            where = {"document_id": filter_document_id}
+            doc_ids.append(filter_document_id)
+        if filter_document_ids:
+            doc_ids.extend(filter_document_ids)
+
+        if doc_ids:
+            doc_ids = list(dict.fromkeys(doc_ids))
+            if len(doc_ids) == 1:
+                where = {"document_id": doc_ids[0]}
+            else:
+                where = {"document_id": {"$in": doc_ids}}
 
         with log_latency(logger, "vector_store_search", query_length=len(query), top_k=k):
             query_embedding = self._embedding_service.embed_query(query)
@@ -285,7 +297,9 @@ class VectorStore:
 
             chunk_meta = ChunkMetadata(
                 source=meta.get("source", "unknown"),
+                document_name=meta.get("document_name") or meta.get("source") or "unknown",
                 page=page_num,
+                file_type=meta.get("file_type") or "",
                 chunk_id=chunk_id,
                 document_id=meta.get("document_id", ""),
                 total_chunks=meta.get("total_chunks"),

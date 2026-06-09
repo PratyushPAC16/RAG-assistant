@@ -112,6 +112,11 @@ def merge_add_float(left: float | None, right: float | None) -> float:
     return (left or 0.0) + (right or 0.0)
 
 
+def merge_filter_document_ids(left: list[str] | None, right: list[str] | None) -> list[str] | None:
+    """Keep document filter IDs (they don't change)."""
+    return right if right is not None else left
+
+
 class GraphState(TypedDict):
     query: str
     session_id: str
@@ -131,6 +136,7 @@ class GraphState(TypedDict):
     completion_tokens: Annotated[int, merge_add_int]
     total_tokens: Annotated[int, merge_add_int]
     cost_usd: Annotated[float, merge_add_float]
+    filter_document_ids: Annotated[list[str] | None, merge_filter_document_ids]
 
 
 
@@ -386,6 +392,7 @@ class AgentOrchestrator:
         session_id: str | None = None,
         conversation_history: list[ChatMessage] | None = None,
         use_web_search: bool = True,
+        filter_document_ids: list[str] | None = None,
     ) -> AgentState:
         """
         Execute the full agentic pipeline for a user query.
@@ -400,6 +407,7 @@ class AgentOrchestrator:
             session_id:           Session identifier for memory continuity.
             conversation_history: Previous messages to inject into state.
             use_web_search:       Whether web routing is allowed.
+            filter_document_ids:  Optional list of document IDs to restrict search.
 
         Returns:
             Final :class:`~app.models.schemas.AgentState` with answer and sources.
@@ -416,6 +424,7 @@ class AgentOrchestrator:
             query=query,
             session_id=sid,
             conversation_history=merged_history,
+            filter_document_ids=filter_document_ids,
         )
 
         with log_latency(logger, "full_pipeline", session_id=sid, query=query):

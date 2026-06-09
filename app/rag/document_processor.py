@@ -209,7 +209,7 @@ class DocumentProcessor:
         ):
             pages = self._extract_pages(file_path, file_type)
             documents, chunk_metas = self._chunk_pages(
-                pages, file_path.name, document_id
+                pages, file_path.name, document_id, file_type.value
             )
 
         logger.info(
@@ -241,6 +241,7 @@ class DocumentProcessor:
         pages: list[tuple[int, str]],
         filename: str,
         document_id: str,
+        file_type: str,
     ) -> tuple[list[Document], list[ChunkMetadata]]:
         """
         Split each page's text using the configured splitter, assign metadata,
@@ -265,7 +266,9 @@ class DocumentProcessor:
                 cid = _chunk_id(filename, page_num, global_index)
                 meta = ChunkMetadata(
                     source=filename,
+                    document_name=filename,
                     page=page_num,
+                    file_type=file_type,
                     chunk_id=cid,
                     document_id=document_id,
                     total_chunks=total_chunks_estimate,

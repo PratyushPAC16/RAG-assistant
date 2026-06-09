@@ -133,6 +133,7 @@ class HybridRetriever:
         self,
         query: str,
         top_k: int | None = None,
+        filter_document_ids: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         """
         Convenience wrapper — returns only the chunk list.
@@ -140,17 +141,19 @@ class HybridRetriever:
         Args:
             query: The user's search query.
             top_k: Number of fused results to return (default: ``settings.retrieval_top_k``).
+            filter_document_ids: Restrict search to specific document UUIDs.
 
         Returns:
             List of :class:`~app.models.schemas.RetrievedChunk` sorted by
             descending RRF score, length ≤ *top_k*.
         """
-        return self.retrieve_with_metrics(query, top_k=top_k).chunks
+        return self.retrieve_with_metrics(query, top_k=top_k, filter_document_ids=filter_document_ids).chunks
 
     def retrieve_with_metrics(
         self,
         query: str,
         top_k: int | None = None,
+        filter_document_ids: list[str] | None = None,
     ) -> RetrievalResult:
         """
         Run the full hybrid retrieval pipeline and return both results and
@@ -159,6 +162,7 @@ class HybridRetriever:
         Args:
             query: The user's search query.
             top_k: Number of results to return (default: ``settings.retrieval_top_k``).
+            filter_document_ids: Restrict search to specific document UUIDs.
 
         Returns:
             :class:`RetrievalResult` containing the merged chunk list plus
@@ -174,7 +178,7 @@ class HybridRetriever:
 
         # ── Stage 1: Semantic search ───────────────────────────────────────────
         t0 = time.perf_counter()
-        semantic_chunks = self._semantic_search(query, top_k=k)
+        semantic_chunks = self._semantic_search(query, top_k=k, filter_document_ids=filter_document_ids)
         result.vector_search_latency_ms = round((time.perf_counter() - t0) * 1000, 2)
         result.num_vector_results = len(semantic_chunks)
 
@@ -185,7 +189,7 @@ class HybridRetriever:
 
         # ── Stage 2: BM25 keyword search ───────────────────────────────────────
         t0 = time.perf_counter()
-        keyword_chunks = self._bm25_search(query, top_k=k)
+        keyword_chunks = self._bm25_search(query, top_k=k, filter_document_ids=filter_document_ids)
         result.bm25_search_latency_ms = round((time.perf_counter() - t0) * 1000, 2)
         result.num_bm25_results = len(keyword_chunks)
 
@@ -268,7 +272,9 @@ class HybridRetriever:
 
                 chunk_meta = ChunkMetadata(
                     source=meta.get("source", "unknown"),
+                    document_name=meta.get("document_name") or meta.get("source") or "unknown",
                     page=page_num,
+                    file_type=meta.get("file_type") or "",
                     chunk_id=cid,
                     document_id=meta.get("document_id", ""),
                 )
@@ -287,16 +293,28 @@ class HybridRetriever:
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
-    def _semantic_search(self, query: str, top_k: int) -> list[RetrievedChunk]:
+    def _semantic_search(
+        self,
+        query: str,
+        top_k: int,
+        filter_document_ids: list[str] | None = None,
+    ) -> list[RetrievedChunk]:
         """Delegate to ChromaDB for vector-space similarity search."""
         with log_latency(logger, "vector_store_search", query_length=len(query), top_k=top_k):
             try:
-                return self._vector_store.search(query, top_k=top_k)
+                return self._vector_store.search(
+                    query, top_k=top_k, filter_document_ids=filter_document_ids
+                )
             except Exception as exc:
                 logger.error("Semantic search failed", extra={"error": str(exc)})
                 return []
 
-    def _bm25_search(self, query: str, top_k: int) -> list[RetrievedChunk]:
+    def _bm25_search(
+        self,
+        query: str,
+        top_k: int,
+        filter_document_ids: list[str] | None = None,
+    ) -> list[RetrievedChunk]:
         """
         Run BM25 keyword search.  Lazily builds the index on the first call.
         """
@@ -317,6 +335,15 @@ class HybridRetriever:
         scored_pairs = sorted(
             zip(scores, self._bm25_corpus), key=lambda x: x[0], reverse=True
         )
+
+        # Apply document filter if provided
+        if filter_document_ids:
+            filter_set = set(filter_document_ids)
+            scored_pairs = [
+                (score, chunk) for score, chunk in scored_pairs
+                if chunk.metadata.document_id in filter_set
+            ]
+
         results: list[RetrievedChunk] = []
         for score, chunk in scored_pairs[:top_k]:
             # Clone to avoid mutating the corpus index

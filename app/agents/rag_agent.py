@@ -103,7 +103,9 @@ class RAGAgent:
         try:
             # ── Step 1: Hybrid retrieval with detailed metrics ─────────────────
             retrieval_result = self._retriever.retrieve_with_metrics(
-                query=query, top_k=settings.retrieval_top_k
+                query=query,
+                top_k=settings.retrieval_top_k,
+                filter_document_ids=state.filter_document_ids,
             )
             chunks = retrieval_result.chunks
             state.retrieved_chunks = chunks
