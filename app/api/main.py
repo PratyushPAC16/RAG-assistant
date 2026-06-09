@@ -348,6 +348,128 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
         )
 
 
+# ── Career Intelligence Analyzer ──────────────────────────────────────────────
+
+_ANALYSIS_SYSTEM_PROMPT = """You are an ATS (Applicant Tracking System) and Career Intelligence Agent.
+Compare the provided Resume text and Job Description text.
+
+Extract the following details and perform a comparison:
+1. Skills present in the resume.
+2. Projects mentioned in the resume.
+3. Education history from the resume.
+4. Experience history from the resume.
+5. Job Description requirements (skills, experience, education).
+6. Strengths of the candidate relative to the JD.
+7. Missing skills (skills in the JD but missing from the resume).
+8. Recommendations to improve the resume or prepare for the interview.
+
+Perform scoring:
+- Match Score (0 to 100) based on overall fit.
+- Skill Match % (0 to 100) based on key technologies/skills match.
+- Project Match % (0 to 100) based on relevance of projects.
+- Education Match % (0 to 100) based on degree/major requirements match.
+- Interview Readiness Score (0 to 100) based on seniority and experience fit.
+
+You MUST respond with a single valid JSON object containing the exact keys listed below:
+{
+  "match_score": 85,
+  "skill_match_pct": 80,
+  "project_match_pct": 75,
+  "education_match_pct": 100,
+  "interview_readiness_score": 90,
+  "extracted_skills": [
+    {"name": "Python", "present": true},
+    {"name": "ChromaDB", "present": false}
+  ],
+  "extracted_projects": ["Project A: built a RAG app...", "Project B: ..."],
+  "extracted_education": "MS in CS from Stanford University",
+  "extracted_experience": "3 years as a Software Engineer at Google",
+  "jd_requirements": ["Degree in CS", "Experience with RAG", "Knowledge of ChromaDB"],
+  "strengths": ["Strong Python background", "Relevant RAG projects"],
+  "missing_skills": ["ChromaDB", "LangGraph"],
+  "recommendations": ["Add ChromaDB details to Project A", "Review LangGraph routing concepts"]
+}
+
+Respond ONLY with the raw JSON. Do not include markdown code fences, notes, or explanations outside the JSON."""
+
+
+@app.post(
+    "/analyze-resume",
+    tags=["Career Intelligence"],
+    summary="Analyze resume against job description",
+)
+async def analyze_resume(
+    resume: UploadFile = File(...),
+    jd: UploadFile = File(...)
+) -> dict:
+    """
+    Compare a candidate's resume PDF against a job description PDF.
+    Extracts skills, education, experience, projects, and calculates match scores.
+    """
+    import json
+    from app.utils.pdf_extractor import extract_text_from_pdf
+    from app.utils.llm_factory import get_llm
+    from langchain_core.messages import SystemMessage, HumanMessage
+
+    # Validate file extensions
+    for f in (resume, jd):
+        ext = Path(f.filename or "").suffix.lower().lstrip(".")
+        if ext != "pdf":
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"Only PDF files are supported. Uploaded file is '.{ext}'"
+            )
+
+    try:
+        # Extract text from both files
+        resume_bytes = await resume.read()
+        jd_bytes = await jd.read()
+        
+        resume_text = extract_text_from_pdf(resume_bytes)
+        jd_text = extract_text_from_pdf(jd_bytes)
+
+        if not resume_text.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to extract readable text from Resume PDF."
+            )
+        if not jd_text.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to extract readable text from Job Description PDF."
+            )
+
+        # Assemble prompt for LLM comparison
+        prompt = f"RESUME TEXT:\n{resume_text}\n\nJOB DESCRIPTION TEXT:\n{jd_text}"
+        messages = [
+            SystemMessage(content=_ANALYSIS_SYSTEM_PROMPT),
+            HumanMessage(content=prompt)
+        ]
+
+        llm = get_llm(temperature=0.1)
+        response = llm.invoke(messages)
+        content = response.content.strip()
+
+        # Clean code fences
+        if content.startswith("```json"):
+            content = content[7:]
+        if content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
+
+        analysis_result = json.loads(content)
+        return analysis_result
+
+    except Exception as exc:
+        logger.error(f"Resume analysis failed: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Resume analysis comparison failed: {exc}"
+        )
+
+
 # ── Chat endpoint ──────────────────────────────────────────────────────────────
 
 @app.post(

@@ -5,6 +5,10 @@ Streamlit frontend — three-page app: Dashboard, Chat, and Analytics.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+
 import time
 from datetime import datetime
 from typing import Any
@@ -273,6 +277,7 @@ def init_session_state() -> None:
         "session_id": None,
         "chat_history": [],  # list[dict] with role, content, agent, sources, latency
         "page": "dashboard",
+        "resume_analysis_result": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -322,6 +327,7 @@ def render_sidebar() -> str:
         pages = {
             "🏠 Dashboard": "dashboard",
             "💬 Chat": "chat",
+            "💼 Career Intelligence": "career_intelligence",
             "🧠 Memory": "memory_dashboard",
             "🔀 Workflow": "workflow",
             "📊 Analytics": "analytics",
@@ -1216,6 +1222,183 @@ def render_workflow() -> None:
         st.info("No query routing records found yet.")
 
 
+# ── Page: Career Intelligence Analyzer ─────────────────────────────────────────
+
+def render_career_intelligence() -> None:
+    st.markdown(
+        '<div class="section-header">💼 Career Intelligence Agent</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        Analyze your resume against any job description to assess your matching score, 
+        uncover critical skill gaps, and get actionable recommendations.
+        """
+    )
+    
+    col_u1, col_u2 = st.columns(2, gap="large")
+    with col_u1:
+        resume_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"], key="ci_resume_uploader")
+    with col_u2:
+        jd_file = st.file_uploader("Upload Job Description (PDF)", type=["pdf"], key="ci_jd_uploader")
+        
+    if resume_file and jd_file:
+        if st.button("⚡ Run Fit Analysis", use_container_width=True, type="primary"):
+            with st.spinner("Analyzing profile alignment with JD requirements..."):
+                files = {
+                    "resume": (resume_file.name, resume_file.getvalue(), "application/pdf"),
+                    "jd": (jd_file.name, jd_file.getvalue(), "application/pdf"),
+                }
+                result = api_post("/analyze-resume", files=files, timeout=120.0)
+                if result:
+                    st.session_state.resume_analysis_result = result
+                    st.success("Analysis complete!")
+                    st.rerun()
+                    
+    if st.session_state.resume_analysis_result:
+        res = st.session_state.resume_analysis_result
+        
+        # ── KPI Row ──
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Overall Match Score", f"{res.get('match_score', 0)}%")
+        c2.metric("Skill Match", f"{res.get('skill_match_pct', 0)}%")
+        c3.metric("Project Match", f"{res.get('project_match_pct', 0)}%")
+        c4.metric("Interview Readiness", f"{res.get('interview_readiness_score', 0)}%")
+        
+        st.divider()
+        
+        # ── Charts Row ──
+        chart_col1, chart_col2 = st.columns([1, 1], gap="large")
+        
+        with chart_col1:
+            # 1. Radar Chart
+            st.markdown("#### 🕸 Profile Fit Radar")
+            categories = ['Overall Fit', 'Skill Match', 'Project Match', 'Education Match', 'Interview Readiness']
+            values = [
+                res.get('match_score', 0),
+                res.get('skill_match_pct', 0),
+                res.get('project_match_pct', 0),
+                res.get('education_match_pct', 0),
+                res.get('interview_readiness_score', 0)
+            ]
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatterpolar(
+                r=values,
+                theta=categories,
+                fill='toself',
+                fillcolor='rgba(59, 130, 246, 0.2)',
+                line=dict(color='#3b82f6', width=2),
+                marker=dict(color='#1d4ed8', size=6)
+            ))
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, 100],
+                        color='#94a3b8',
+                        gridcolor='#334155',
+                    ),
+                    angularaxis=dict(
+                        color='#e2e8f0',
+                        gridcolor='#334155',
+                    ),
+                    bgcolor='rgba(0,0,0,0)'
+                ),
+                showlegend=False,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(l=40, r=40, t=20, b=20),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with chart_col2:
+            # 2. Skill Gap Visualization
+            st.markdown("#### 📊 Skill Gaps & Alignment")
+            skills = res.get("extracted_skills", [])
+            if skills:
+                names = [s.get("name") for s in skills]
+                present = [1 if s.get("present") else 0 for s in skills]
+                colors_list = ['#10b981' if p else '#ef4444' for p in present]
+                labels = ['Present' if p else 'Missing' for p in present]
+                
+                fig_skills = go.Figure(go.Bar(
+                    x=names,
+                    y=[100] * len(skills),
+                    marker_color=colors_list,
+                    text=labels,
+                    textposition='auto',
+                    hoverinfo='x+text',
+                ))
+                fig_skills.update_layout(
+                    yaxis=dict(visible=False),
+                    xaxis=dict(tickangle=-45),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="#e2e8f0",
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    height=320,
+                )
+                st.plotly_chart(fig_skills, use_container_width=True)
+            else:
+                st.caption("No specific skills breakdown extracted.")
+                
+        st.divider()
+        
+        # ── Details & Recommendations Tabs ──
+        tab_ins, tab_feat, tab_pdf = st.tabs(["🎯 Insights & Gaps", "📝 Extracted Profile Features", "📥 PDF Export"])
+        
+        with tab_ins:
+            t_col1, t_col2 = st.columns(2)
+            with t_col1:
+                st.markdown("##### 🟢 Strengths")
+                for s in res.get("strengths", []):
+                    st.markdown(f"- {s}")
+            with t_col2:
+                st.markdown("##### 🔴 Missing Skills & Gaps")
+                for m in res.get("missing_skills", []):
+                    st.markdown(f"- {m}")
+                    
+            st.write("")
+            st.markdown("##### 💡 Actionable Recommendations")
+            for r in res.get("recommendations", []):
+                st.markdown(f"- {r}")
+                
+        with tab_feat:
+            tf_col1, tf_col2 = st.columns(2)
+            with tf_col1:
+                st.markdown("##### 📚 Extracted Education")
+                st.write(res.get("extracted_education", "Not specified."))
+                st.markdown("##### 💼 Extracted Experience")
+                st.write(res.get("extracted_experience", "Not specified."))
+            with tf_col2:
+                st.markdown("##### 🛠️ JD Core Requirements")
+                for req in res.get("jd_requirements", []):
+                    st.markdown(f"- {req}")
+                st.markdown("##### 🚀 Extracted Projects")
+                for p in res.get("extracted_projects", []):
+                    st.markdown(f"- {p}")
+                    
+        with tab_pdf:
+            st.markdown("##### Generate & Download PDF Report")
+            st.write("Export a professionally compiled ReportLab PDF summarizing scores, skill gaps, and recommendations.")
+            
+            from app.utils.pdf_generator import generate_resume_analysis_pdf
+            pdf_bytes = generate_resume_analysis_pdf(res)
+            if pdf_bytes:
+                res_name = resume_file.name if resume_file else "analysis"
+                file_suffix = res_name.split('.')[0] if '.' in res_name else res_name
+                st.download_button(
+                    label="📥 Download PDF Report",
+                    data=pdf_bytes,
+                    file_name=f"career_intel_report_{file_suffix}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            else:
+                st.error("Failed to generate PDF report bytes.")
+
+
 # ── Page: Long-Term Memory Dashboard ───────────────────────────────────────────
 
 def render_memory_dashboard() -> None:
@@ -1351,6 +1534,8 @@ def main() -> None:
         render_dashboard()
     elif page == "chat":
         render_chat()
+    elif page == "career_intelligence":
+        render_career_intelligence()
     elif page == "memory_dashboard":
         render_memory_dashboard()
     elif page == "workflow":
