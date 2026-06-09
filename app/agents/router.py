@@ -116,13 +116,20 @@ class RouterAgent:
             )
 
             with log_latency(logger, "routing", query=query) as route_ctx:
-                agent_type, decision = self._classify_with_decision(
+                agent_type, decision, p_tok, c_tok, t_tok = self._classify_with_decision(
                     query=query,
                     num_docs=num_docs,
                     has_history=has_history,
                     history_preview=history_preview,
                 )
             state.latency_ms["routing"] = route_ctx.get("latency_ms", 0.0)
+
+            # Accumulate router token usage and cost
+            state.prompt_tokens += p_tok
+            state.completion_tokens += c_tok
+            state.total_tokens += t_tok
+            from app.utils.llm_factory import calculate_cost
+            state.cost_usd += calculate_cost(p_tok, c_tok)
 
             state.agent_type = agent_type
             state.routing_decision = decision
@@ -203,10 +210,10 @@ class RouterAgent:
         num_docs: int,
         has_history: bool,
         history_preview: str,
-    ) -> tuple[AgentType, RoutingDecision]:
+    ) -> tuple[AgentType, RoutingDecision, int, int, int]:
         """
-        Use the LLM to classify the query and return both the AgentType
-        and a populated :class:`RoutingDecision`.
+        Use the LLM to classify the query and return both the AgentType,
+        a populated :class:`RoutingDecision`, and the token count details.
 
         Falls back to rule-based routing if LLM output cannot be parsed.
         """
@@ -223,9 +230,12 @@ class RouterAgent:
 
         try:
             response = self._llm.invoke(messages)
-            return self._parse_routing_response_with_decision(
+            from app.utils.llm_factory import extract_token_usage
+            p_tok, c_tok, t_tok = extract_token_usage(response)
+            agent_type, decision = self._parse_routing_response_with_decision(
                 response.content, num_docs, query, has_history
             )
+            return agent_type, decision, p_tok, c_tok, t_tok
         except Exception as exc:
             logger.warning(
                 "LLM routing failed, using fallback",
@@ -239,7 +249,7 @@ class RouterAgent:
                 fallback_used=True,
                 num_docs_available=num_docs,
             )
-            return agent_type, decision
+            return agent_type, decision, 0, 0, 0
 
     def _classify(
         self,

@@ -119,6 +119,13 @@ class ResponseSynthesizer:
             with log_latency(logger, "synthesis_llm_generation") as llm_ctx:
                 response = self._llm.invoke(messages)
                 answer = response.content
+                
+                from app.utils.llm_factory import extract_token_usage, calculate_cost
+                p_tok, c_tok, t_tok = extract_token_usage(response)
+                state.prompt_tokens += p_tok
+                state.completion_tokens += c_tok
+                state.total_tokens += t_tok
+                state.cost_usd += calculate_cost(p_tok, c_tok)
             state.latency_ms["synthesis_llm"] = llm_ctx.get("latency_ms", 0.0)
 
             # ── 4. Extract citations and update state ──────────────────────────

@@ -242,6 +242,11 @@ class AgentState(BaseModel):
         default_factory=list,
         description="Step-by-step log of the routing and execution path",
     )
+    # ── Token & Cost observability ────────────────────────────────
+    prompt_tokens: int = Field(default=0, description="Sum of prompt tokens used across LLM calls")
+    completion_tokens: int = Field(default=0, description="Sum of completion tokens used across LLM calls")
+    total_tokens: int = Field(default=0, description="Sum of total tokens used across LLM calls")
+    cost_usd: float = Field(default=0.0, description="Estimated cost of LLM calls in USD")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -298,6 +303,11 @@ class ChatResponse(BaseModel):
         default_factory=list,
         description="Step-by-step execution path through the LangGraph workflow",
     )
+    # ── Token & Cost observability ────────────────────────────────
+    prompt_tokens: int = Field(default=0, description="Sum of prompt tokens used across LLM calls")
+    completion_tokens: int = Field(default=0, description="Sum of completion tokens used across LLM calls")
+    total_tokens: int = Field(default=0, description="Sum of total tokens used across LLM calls")
+    cost_usd: float = Field(default=0.0, description="Estimated cost of LLM calls in USD")
 
 
 class DocumentListResponse(BaseModel):
@@ -379,3 +389,8 @@ class RetrievalMetric(BaseModel):
     # ── Final output ──────────────────────────────────────────────
     sources_used: list[str] = Field(default_factory=list)
     top_reranked_sources: list[str] = Field(default_factory=list)
+    # ── Token & Cost observability ────────────────────────────────
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    cost_usd: float = 0.0

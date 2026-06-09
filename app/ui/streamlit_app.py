@@ -489,6 +489,15 @@ def render_chat() -> None:
                             st.markdown(f"**Target Agent:** `{routing_decision.get('agent', 'unknown').upper()}` | **Confidence:** `{conf_pct}%`{fallback}")
                             if routing_decision.get("reasoning"):
                                 st.markdown(f"*Reasoning:* {routing_decision.get('reasoning')}")
+                        
+                        # Token & Cost Metrics
+                        prompt_tok = turn.get("prompt_tokens", 0) or result.get("prompt_tokens", 0) if 'result' in locals() else turn.get("prompt_tokens", 0)
+                        comp_tok = turn.get("completion_tokens", 0) or result.get("completion_tokens", 0) if 'result' in locals() else turn.get("completion_tokens", 0)
+                        tot_tok = turn.get("total_tokens", 0) or result.get("total_tokens", 0) if 'result' in locals() else turn.get("total_tokens", 0)
+                        c_usd = turn.get("cost_usd", 0.0) or result.get("cost_usd", 0.0) if 'result' in locals() else turn.get("cost_usd", 0.0)
+                        if tot_tok > 0:
+                            st.markdown(f"**Tokens used:** `{tot_tok}` (Prompt: `{prompt_tok}`, Completion: `{comp_tok}`) | **Estimated Cost:** `${c_usd:.6f}`")
+
                         if routing_trace:
                             st.markdown("**Execution Trace Steps:**")
                             for step in routing_trace:
@@ -526,6 +535,10 @@ def render_chat() -> None:
                     "latency": latency_label,
                     "routing_decision": result.get("routing_decision"),
                     "routing_trace": result.get("routing_trace", []),
+                    "prompt_tokens": result.get("prompt_tokens", 0),
+                    "completion_tokens": result.get("completion_tokens", 0),
+                    "total_tokens": result.get("total_tokens", 0),
+                    "cost_usd": result.get("cost_usd", 0.0),
                 }
             )
 
@@ -554,14 +567,17 @@ def render_analytics() -> None:
         return
 
     total_q = data.get("total_queries", 0)
+    q_today = data.get("queries_today", 0)
+    total_cost = _safe_get(data, "total_cost_usd")
+    total_tok = _safe_get(data, "total_tokens")
 
     # ── Row 1: KPI cards ──────────────────────────────────────────────────────
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total Queries", total_q)
-    c2.metric("Avg Total Latency", f"{_safe_get(data, 'avg_total_latency_ms'):.0f} ms")
-    c3.metric("Avg Retrieval", f"{_safe_get(data, 'avg_retrieval_latency_ms'):.0f} ms")
-    c4.metric("Avg Reranking", f"{_safe_get(data, 'avg_reranking_ms'):.0f} ms")
-    c5.metric("Avg LLM", f"{_safe_get(data, 'avg_llm_ms'):.0f} ms")
+    c1.metric("Total Queries", f"{total_q:,}")
+    c2.metric("Queries Today", f"{q_today:,}")
+    c3.metric("Avg Response Latency", f"{_safe_get(data, 'avg_total_latency_ms'):.0f} ms")
+    c4.metric("Total Cost", f"${total_cost:.4f}")
+    c5.metric("Total Tokens", f"{total_tok:,.0f}")
 
     st.divider()
 
@@ -604,9 +620,9 @@ def render_analytics() -> None:
             }
             colors = [color_map.get(k, "#64748b") for k in agent_dist.keys()]
             fig_pie = px.pie(
-                names=list(agent_dist.keys()),
+                names=[k.upper() for k in agent_dist.keys()],
                 values=list(agent_dist.values()),
-                title="Agent Distribution",
+                title="Agent Usage Breakdown",
                 color_discrete_sequence=colors,
                 hole=0.5,
             )
@@ -618,6 +634,48 @@ def render_analytics() -> None:
             st.plotly_chart(fig_pie, use_container_width=True)
 
     st.divider()
+
+    # ── Daily Trends (Queries & Costs) ──
+    daily_trend = data.get("daily_trend", [])
+    if daily_trend:
+        st.markdown("#### 📅 Daily Volume & Cost Trends")
+        daily_df = pd.DataFrame(daily_trend)
+        
+        col_t1, col_t2 = st.columns(2, gap="large")
+        with col_t1:
+            fig_q_trend = px.bar(
+                daily_df,
+                x="date",
+                y="queries",
+                title="Daily Query Volume",
+                labels={"queries": "Number of Queries", "date": "Date"},
+                color_discrete_sequence=["#3b82f6"],
+            )
+            fig_q_trend.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0",
+            )
+            st.plotly_chart(fig_q_trend, use_container_width=True)
+            
+        with col_t2:
+            fig_cost_trend = px.line(
+                daily_df,
+                x="date",
+                y="cost",
+                title="Daily Estimated LLM Cost (USD)",
+                labels={"cost": "Cost (USD)", "date": "Date"},
+                color_discrete_sequence=["#10b981"],
+                markers=True,
+            )
+            fig_cost_trend.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0",
+            )
+            st.plotly_chart(fig_cost_trend, use_container_width=True)
+
+        st.divider()
 
     # ── Row 3: Per-stage latency waterfall ────────────────────────────────────
     st.markdown("#### ⏱ Pipeline Stage Latency Breakdown")
@@ -715,38 +773,91 @@ def render_analytics() -> None:
 
     st.divider()
 
-    # ── Row 5: Latency trend line ─────────────────────────────────────────────
+    # ── Row 5: Latency and Token Usage/Cost trends ────────────────────────────
     if recent:
-        st.markdown("#### 📉 Latency Trend (Recent Queries)")
-        latency_data = []
-        for i, m in enumerate(recent):
-            latency_data.append({
-                "Query #": i + 1,
-                "Total (ms)": round(m.get("total_latency_ms", 0), 1),
-                "Retrieval (ms)": round(m.get("retrieval_latency_ms", 0), 1),
-                "Reranking (ms)": round(m.get("reranking_latency_ms") or 0, 1),
-                "LLM (ms)": round(m.get("llm_latency_ms") or 0, 1),
-            })
-        lat_df = pd.DataFrame(latency_data)
-        fig_trend = px.line(
-            lat_df,
-            x="Query #",
-            y=["Total (ms)", "Retrieval (ms)", "Reranking (ms)", "LLM (ms)"],
-            title="Per-Stage Latency Over Time",
-            color_discrete_map={
-                "Total (ms)": "#64748b",
-                "Retrieval (ms)": "#3b82f6",
-                "Reranking (ms)": "#a855f7",
-                "LLM (ms)": "#ec4899",
-            },
-            markers=True,
-        )
-        fig_trend.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font_color="#e2e8f0",
-        )
-        st.plotly_chart(fig_trend, use_container_width=True)
+        tab_lat, tab_tok = st.tabs(["📉 Latency Trend", "🪙 Token & Cost Trend"])
+        
+        with tab_lat:
+            st.markdown("#### 📉 Latency Trend (Recent Queries)")
+            latency_data = []
+            for i, m in enumerate(recent):
+                latency_data.append({
+                    "Query #": i + 1,
+                    "Total (ms)": round(m.get("total_latency_ms", 0), 1),
+                    "Retrieval (ms)": round(m.get("retrieval_latency_ms", 0), 1),
+                    "Reranking (ms)": round(m.get("reranking_latency_ms") or 0, 1),
+                    "LLM (ms)": round(m.get("llm_latency_ms") or 0, 1),
+                })
+            lat_df = pd.DataFrame(latency_data)
+            fig_trend = px.line(
+                lat_df,
+                x="Query #",
+                y=["Total (ms)", "Retrieval (ms)", "Reranking (ms)", "LLM (ms)"],
+                title="Per-Stage Latency Over Time",
+                color_discrete_map={
+                    "Total (ms)": "#64748b",
+                    "Retrieval (ms)": "#3b82f6",
+                    "Reranking (ms)": "#a855f7",
+                    "LLM (ms)": "#ec4899",
+                },
+                markers=True,
+            )
+            fig_trend.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0",
+            )
+            st.plotly_chart(fig_trend, use_container_width=True)
+            
+        with tab_tok:
+            st.markdown("#### 🪙 Token & Cost Trend (Recent Queries)")
+            token_data = []
+            for i, m in enumerate(recent):
+                token_data.append({
+                    "Query #": i + 1,
+                    "Prompt Tokens": m.get("prompt_tokens", 0),
+                    "Completion Tokens": m.get("completion_tokens", 0),
+                    "Total Tokens": m.get("total_tokens", 0),
+                    "Cost ($)": m.get("cost_usd", 0.0),
+                })
+            tok_df = pd.DataFrame(token_data)
+            
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                fig_tok = px.line(
+                    tok_df,
+                    x="Query #",
+                    y=["Prompt Tokens", "Completion Tokens", "Total Tokens"],
+                    title="Token Usage Over Time",
+                    color_discrete_map={
+                        "Prompt Tokens": "#3b82f6",
+                        "Completion Tokens": "#10b981",
+                        "Total Tokens": "#a855f7",
+                    },
+                    markers=True,
+                )
+                fig_tok.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font_color="#e2e8f0",
+                )
+                st.plotly_chart(fig_tok, use_container_width=True)
+                
+            with col_t2:
+                fig_cost = px.line(
+                    tok_df,
+                    x="Query #",
+                    y="Cost ($)",
+                    title="Estimated Cost per Query (USD)",
+                    color_discrete_sequence=["#ec4899"],
+                    markers=True,
+                )
+                fig_cost.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font_color="#e2e8f0",
+                )
+                st.plotly_chart(fig_cost, use_container_width=True)
 
     st.divider()
 
@@ -756,15 +867,14 @@ def render_analytics() -> None:
         rows = []
         for m in reversed(recent[-20:]):
             rows.append({
-                "Query": (m.get("query", "")[:50] + "…") if len(m.get("query", "")) > 50 else m.get("query", ""),
+                "Query": (m.get("query", "")[:40] + "…") if len(m.get("query", "")) > 40 else m.get("query", ""),
                 "Agent": m.get("agent_type", "").upper(),
                 "Vector Hits": m.get("num_vector_results", 0),
                 "BM25 Hits": m.get("num_bm25_results", 0),
-                "After RRF": m.get("num_retrieved", 0),
                 "Reranked": m.get("num_reranked", 0),
-                "Vector (ms)": round(m.get("vector_search_latency_ms", 0), 1),
-                "BM25 (ms)": round(m.get("bm25_search_latency_ms", 0), 1),
-                "RRF (ms)": round(m.get("rrf_fusion_latency_ms", 0), 1),
+                "Prompt Tok": m.get("prompt_tokens", 0),
+                "Comp Tok": m.get("completion_tokens", 0),
+                "Cost": f"${m.get('cost_usd', 0.0):.5f}",
                 "Rerank (ms)": round(m.get("reranking_latency_ms") or 0, 1),
                 "LLM (ms)": round(m.get("llm_latency_ms") or 0, 1),
                 "Total (ms)": round(m.get("total_latency_ms", 0), 1),

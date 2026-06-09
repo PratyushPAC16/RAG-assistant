@@ -102,6 +102,16 @@ def merge_routing_decision(
     return left if left is not None else right
 
 
+def merge_add_int(left: int | None, right: int | None) -> int:
+    """Sum integers across parallel branches."""
+    return (left or 0) + (right or 0)
+
+
+def merge_add_float(left: float | None, right: float | None) -> float:
+    """Sum floats across parallel branches."""
+    return (left or 0.0) + (right or 0.0)
+
+
 class GraphState(TypedDict):
     query: str
     session_id: str
@@ -117,6 +127,11 @@ class GraphState(TypedDict):
     latency_ms: Annotated[dict[str, float], merge_latency]
     routing_decision: Annotated[Any | None, merge_routing_decision]
     routing_trace: Annotated[list[str], merge_routing_trace]
+    prompt_tokens: Annotated[int, merge_add_int]
+    completion_tokens: Annotated[int, merge_add_int]
+    total_tokens: Annotated[int, merge_add_int]
+    cost_usd: Annotated[float, merge_add_float]
+
 
 
 def _state_to_dict(state: AgentState) -> dict[str, Any]:

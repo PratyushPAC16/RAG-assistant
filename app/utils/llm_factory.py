@@ -242,3 +242,62 @@ def _build_ollama_embeddings(settings: Any) -> Embeddings:
         extra={"provider": "ollama", "model": settings.ollama_embedding_model},
     )
     return embeddings
+
+
+def extract_token_usage(response: Any) -> tuple[int, int, int]:
+    """
+    Extract (prompt_tokens, completion_tokens, total_tokens) from a LangChain response.
+    """
+    prompt = 0
+    completion = 0
+    total = 0
+    
+    # 1. Try usage_metadata (standard in newer LangChain versions)
+    usage = getattr(response, "usage_metadata", None)
+    if isinstance(usage, dict):
+        prompt = usage.get("input_tokens") or usage.get("prompt_tokens") or 0
+        completion = usage.get("output_tokens") or usage.get("completion_tokens") or 0
+        total = usage.get("total_tokens") or (prompt + completion)
+        if total > 0:
+            return prompt, completion, total
+            
+    # 2. Try response_metadata (provider-specific fallback)
+    resp_meta = getattr(response, "response_metadata", {})
+    if isinstance(resp_meta, dict):
+        token_usage = resp_meta.get("token_usage")
+        if isinstance(token_usage, dict):
+            prompt = token_usage.get("prompt_tokens") or token_usage.get("input_tokens") or 0
+            completion = token_usage.get("completion_tokens") or token_usage.get("output_tokens") or 0
+            total = token_usage.get("total_tokens") or (prompt + completion)
+            if total > 0:
+                return prompt, completion, total
+        
+        prompt = resp_meta.get("prompt_tokens") or resp_meta.get("input_tokens") or 0
+        completion = resp_meta.get("completion_tokens") or resp_meta.get("output_tokens") or 0
+        total = resp_meta.get("total_tokens") or (prompt + completion)
+        if total > 0:
+            return prompt, completion, total
+
+    return 0, 0, 0
+
+
+def calculate_cost(prompt_tokens: int, completion_tokens: int) -> float:
+    """
+    Calculate cost in USD based on the currently configured provider and model.
+    """
+    settings = get_settings()
+    provider = settings.llm_provider.lower()
+    
+    if provider == "gemini":
+        # Gemini 2.0 Flash pricing: $0.075 / 1M input tokens, $0.30 / 1M output tokens
+        input_rate = 0.075 / 1_000_000
+        output_rate = 0.30 / 1_000_000
+        return (prompt_tokens * input_rate) + (completion_tokens * output_rate)
+    elif provider == "groq":
+        # Groq llama-3.1-8b-instant pricing: $0.05 / 1M input tokens, $0.08 / 1M output tokens
+        input_rate = 0.05 / 1_000_000
+        output_rate = 0.08 / 1_000_000
+        return (prompt_tokens * input_rate) + (completion_tokens * output_rate)
+    # Ollama is local and completely free ($0)
+    return 0.0
+

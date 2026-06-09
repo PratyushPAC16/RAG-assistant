@@ -49,7 +49,35 @@ logger = get_logger(__name__)
 _document_registry: dict[str, DocumentRecord] = {}
 
 # ── Analytics store ────────────────────────────────────────────────────────────
+# ── Analytics store ────────────────────────────────────────────────────────────
 _retrieval_metrics: list[RetrievalMetric] = []
+
+# ── Local persistence helper functions ──────────────────────────────────────────
+
+METRICS_FILE = settings.data_path / "retrieval_metrics.jsonl"
+
+def _load_persisted_metrics() -> list[RetrievalMetric]:
+    metrics = []
+    if METRICS_FILE.exists():
+        try:
+            with open(METRICS_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped:
+                        metrics.append(RetrievalMetric.model_validate_json(stripped))
+            logger.info(f"Loaded {len(metrics)} persisted metrics from {METRICS_FILE}")
+        except Exception as exc:
+            logger.error(f"Failed to load persisted metrics: {exc}", exc_info=True)
+    return metrics
+
+def _persist_metric(metric: RetrievalMetric) -> None:
+    try:
+        # Ensure parent directory exists
+        METRICS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(METRICS_FILE, "a", encoding="utf-8") as f:
+            f.write(metric.model_dump_json() + "\n")
+    except Exception as exc:
+        logger.error(f"Failed to persist metric: {exc}", exc_info=True)
 
 
 # ── Application lifespan ───────────────────────────────────────────────────────
@@ -61,6 +89,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Shutdown: flush any pending state (placeholder).
     """
     logger.info("Starting Enterprise Agentic RAG Assistant API")
+
+    global _retrieval_metrics
+    _retrieval_metrics = _load_persisted_metrics()
 
     # Warm up singletons on startup to avoid first-request latency
     _ = get_vector_store()
@@ -345,8 +376,14 @@ async def chat(request: ChatRequest) -> ChatResponse:
             top_reranked_sources=[
                 c.metadata.source for c in result.reranked_chunks[:5]
             ],
+            # Token & Cost observability
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            total_tokens=result.total_tokens,
+            cost_usd=result.cost_usd,
         )
         _retrieval_metrics.append(metric)
+        _persist_metric(metric)
 
         return ChatResponse(
             answer=result.answer,
@@ -356,6 +393,10 @@ async def chat(request: ChatRequest) -> ChatResponse:
             latency_ms=result.latency_ms,
             routing_decision=result.routing_decision,
             routing_trace=result.routing_trace,
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            total_tokens=result.total_tokens,
+            cost_usd=result.cost_usd,
         )
 
     except Exception as exc:
@@ -492,8 +533,44 @@ async def get_analytics() -> dict:
     avg_retrieved = sum(m.num_retrieved for m in _retrieval_metrics) / total_queries
     avg_reranked = sum(m.num_reranked for m in _retrieval_metrics) / total_queries
 
+    # Daily query, token and cost trends
+    from datetime import datetime, timezone
+    today_date = datetime.now(timezone.utc).date()
+    
+    daily_stats = {}
+    for m in _retrieval_metrics:
+        d_str = m.timestamp.strftime("%Y-%m-%d") if isinstance(m.timestamp, datetime) else str(m.timestamp)[:10]
+        if d_str not in daily_stats:
+            daily_stats[d_str] = {"queries": 0, "tokens": 0, "cost": 0.0}
+        daily_stats[d_str]["queries"] += 1
+        daily_stats[d_str]["tokens"] += getattr(m, "total_tokens", 0)
+        daily_stats[d_str]["cost"] += getattr(m, "cost_usd", 0.0)
+    
+    sorted_daily = sorted(daily_stats.items())
+    daily_trend = [
+        {
+            "date": k, 
+            "queries": v["queries"], 
+            "tokens": v["tokens"], 
+            "cost": round(v["cost"], 6)
+        } for k, v in sorted_daily
+    ]
+
+    queries_today = daily_stats.get(today_date.strftime("%Y-%m-%d"), {}).get("queries", 0)
+
+    total_prompt = sum(m.prompt_tokens for m in _retrieval_metrics)
+    total_completion = sum(m.completion_tokens for m in _retrieval_metrics)
+    total_tokens = sum(m.total_tokens for m in _retrieval_metrics)
+    total_cost = sum(m.cost_usd for m in _retrieval_metrics)
+
+    avg_prompt = total_prompt / total_queries
+    avg_completion = total_completion / total_queries
+    avg_total_tokens = total_tokens / total_queries
+    avg_cost = total_cost / total_queries
+
     return {
         "total_queries": total_queries,
+        "queries_today": queries_today,
         # ── Latency summary ──────────────────────────────────────
         "avg_total_latency_ms": round(avg_total_ms, 2),
         "avg_retrieval_latency_ms": round(avg_retrieval_ms, 2),
@@ -502,6 +579,15 @@ async def get_analytics() -> dict:
         "avg_rrf_fusion_ms": round(avg_rrf_ms, 2),
         "avg_reranking_ms": round(avg_reranking_ms, 2),
         "avg_llm_ms": round(avg_llm_ms, 2),
+        # ── Token & Cost summary ─────────────────────────────────
+        "total_prompt_tokens": total_prompt,
+        "total_completion_tokens": total_completion,
+        "total_tokens": total_tokens,
+        "total_cost_usd": round(total_cost, 6),
+        "avg_prompt_tokens": round(avg_prompt, 2),
+        "avg_completion_tokens": round(avg_completion, 2),
+        "avg_total_tokens": round(avg_total_tokens, 2),
+        "avg_cost_usd": round(avg_cost, 6),
         # ── Funnel summary ───────────────────────────────────────
         "avg_vector_hits": round(avg_vector_hits, 1),
         "avg_bm25_hits": round(avg_bm25_hits, 1),
@@ -511,7 +597,9 @@ async def get_analytics() -> dict:
         "agent_distribution": agent_counts,
         "top_sources": sorted(source_freq.items(), key=lambda x: x[1], reverse=True)[:10],
         "recent_metrics": [m.model_dump() for m in _retrieval_metrics[-20:]],
+        "daily_trend": daily_trend,
     }
+
 
 
 # ── Dedicated retrieval-metrics endpoint ───────────────────────────────────────
