@@ -331,6 +331,7 @@ def render_sidebar() -> str:
             "🧠 Memory": "memory_dashboard",
             "🔀 Workflow": "workflow",
             "📊 Analytics": "analytics",
+            "⚡ LLM Benchmark": "benchmark",
         }
         
         page_vals = list(pages.values())
@@ -1524,6 +1525,339 @@ def render_memory_dashboard() -> None:
                 st.rerun()
 
 
+# ── Page: LLM Benchmark Dashboard ────────────────────────────────────────────────────
+
+_PROVIDER_COLORS = {
+    "gemini": "#4f8ef7",
+    "groq":   "#10b981",
+    "ollama": "#f59e0b",
+}
+_PROVIDER_EMOJI = {
+    "gemini": "🔵 Gemini",
+    "groq":   "🟢 Groq",
+    "ollama": "🟡 Ollama",
+}
+
+
+def _provider_badge(provider: str) -> str:
+    emoji_map = {"gemini": "🔵", "groq": "🟢", "ollama": "🟡"}
+    return f"{emoji_map.get(provider, '🧭')} {provider.capitalize()}"
+
+
+def render_benchmark() -> None:
+    st.markdown(
+        '<div class="section-header">⚡ LLM Benchmark Dashboard</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        Run any prompt across **Ollama (🟡 Local)**, **Groq (🟢 Cloud)**, and **Gemini (🔵 Cloud)**
+        simultaneously. Compare latency, cost, token usage, response length,
+        and LLM-graded faithfulness — then view the ranked leaderboard.
+        """
+    )
+
+    if "benchmark_result" not in st.session_state:
+        st.session_state.benchmark_result = None
+    if "benchmark_history_cache" not in st.session_state:
+        st.session_state.benchmark_history_cache = []
+
+    # ── Input Panel ───────────────────────────────────────────────────────────
+    with st.container():
+        q_col, opt_col = st.columns([3, 1], gap="medium")
+        with q_col:
+            bench_query = st.text_area(
+                "Benchmark Query",
+                value="Explain the difference between RAG and fine-tuning for LLMs.",
+                height=90,
+                key="bench_query_input",
+                label_visibility="collapsed",
+                placeholder="Enter your benchmark prompt here…",
+            )
+        with opt_col:
+            use_rag_toggle = st.toggle(
+                "📚 Inject RAG Context",
+                value=False,
+                key="bench_rag_toggle",
+                help="Retrieve document chunks from ChromaDB and inject them into every provider's prompt.",
+            )
+            temperature = st.slider(
+                "Temperature", min_value=0.0, max_value=1.0,
+                value=0.1, step=0.05, key="bench_temp_slider",
+            )
+
+        run_btn = st.button(
+            "⚡ Run Benchmark Across All Providers",
+            type="primary",
+            use_container_width=True,
+            key="bench_run_btn",
+        )
+
+    if run_btn:
+        if not bench_query.strip():
+            st.warning("Please enter a query before running the benchmark.")
+        else:
+            progress_bar = st.progress(0, text="Initializing concurrent benchmark runners…")
+            with st.spinner("Running prompts on Gemini, Groq, and Ollama simultaneously…"):
+                progress_bar.progress(25, text="🔵 Calling Gemini …")
+                result = api_post(
+                    f"/benchmark?query={bench_query}&use_rag={str(use_rag_toggle).lower()}&temperature={temperature}",
+                    json={},
+                )
+                progress_bar.progress(85, text="Scoring and evaluating faithfulness…")
+            progress_bar.progress(100, text="✅ Benchmark complete!")
+            if result:
+                st.session_state.benchmark_result = result
+                # Refresh history
+                hist = api_get("/benchmark/history", timeout=10.0)
+                if hist:
+                    st.session_state.benchmark_history_cache = hist.get("runs", [])
+                st.success("Benchmark complete! Scroll down to view results.")
+            else:
+                st.error("Benchmark run failed. Check that the FastAPI backend is running.")
+
+    res = st.session_state.benchmark_result
+    if not res:
+        st.info("🎯 Enter a query above and click **Run Benchmark** to see results.")
+        _render_benchmark_history()
+        return
+
+    providers_data: dict = res.get("results", {})
+    run_ts = res.get("timestamp", "")
+    rag_on = res.get("use_rag", False)
+    st.divider()
+
+    # ── Leaderboard Table ──────────────────────────────────────────────────────
+    st.markdown("### 🏆 Leaderboard")
+    meta_col1, meta_col2 = st.columns([3, 1])
+    meta_col1.caption(f"💬 **Query**: {res.get('query', '')[:120]}")
+    meta_col2.caption(f"📡 RAG context: {'Enabled' if rag_on else 'Disabled'}")
+
+    rows = []
+    for pname, pdata in providers_data.items():
+        rows.append({
+            "Provider":          _provider_badge(pname),
+            "Model":             pdata.get("model", "-"),
+            "Latency (s)":       f"{pdata.get('latency_s', 0):.2f}s",
+            "Total Tokens":      pdata.get("total_tokens", 0),
+            "Cost (USD)":        f"${pdata.get('cost_usd', 0):.7f}",
+            "Response Words":    pdata.get("response_length_words", 0),
+            "Accuracy %":        f"{pdata.get('retrieval_accuracy', 0):.0f}%",
+            "⭐ Score":           pdata.get("composite_score", 0),
+            "Error":             pdata.get("error") or "",
+        })
+
+    # Sort by Score descending
+    rows.sort(key=lambda x: x["⭐ Score"], reverse=True)
+    df_lead = pd.DataFrame(rows)
+    st.dataframe(df_lead, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Plotly Charts Grid ─────────────────────────────────────────────────────
+    st.markdown("### 📊 Performance Charts")
+    ch1, ch2 = st.columns(2, gap="large")
+    ch3, ch4 = st.columns(2, gap="large")
+
+    pnames  = list(providers_data.keys())
+    lats    = [providers_data[p].get("latency_s", 0)         for p in pnames]
+    costs   = [providers_data[p].get("cost_usd", 0)          for p in pnames]
+    scores  = [providers_data[p].get("composite_score", 0)   for p in pnames]
+    accurs  = [providers_data[p].get("retrieval_accuracy", 0) for p in pnames]
+    p_toks  = [providers_data[p].get("prompt_tokens", 0)     for p in pnames]
+    c_toks  = [providers_data[p].get("completion_tokens", 0) for p in pnames]
+    colors_ = [_PROVIDER_COLORS.get(p, "#94a3b8")            for p in pnames]
+    labels_ = [_provider_badge(p)                             for p in pnames]
+
+    _CHART_LAYOUT = dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#e2e8f0",
+        margin=dict(l=10, r=10, t=30, b=10),
+        height=280,
+    )
+
+    with ch1:
+        st.markdown("#### ⏱ Latency (seconds)")
+        fig_lat = go.Figure(go.Bar(
+            x=labels_, y=lats, marker_color=colors_,
+            text=[f"{v:.2f}s" for v in lats], textposition="auto",
+        ))
+        fig_lat.update_layout(**_CHART_LAYOUT, yaxis_title="Seconds")
+        st.plotly_chart(fig_lat, use_container_width=True)
+
+    with ch2:
+        st.markdown("#### 💰 Estimated Cost (USD)")
+        fig_cost = go.Figure(go.Bar(
+            x=labels_, y=costs, marker_color=colors_,
+            text=[f"${v:.6f}" for v in costs], textposition="auto",
+        ))
+        fig_cost.update_layout(**_CHART_LAYOUT, yaxis_title="USD")
+        st.plotly_chart(fig_cost, use_container_width=True)
+
+    with ch3:
+        st.markdown("#### ⭐ Composite Score")
+        fig_score = go.Figure(go.Bar(
+            x=labels_, y=scores, marker_color=colors_,
+            text=[f"{v:.1f}" for v in scores], textposition="auto",
+        ))
+        fig_score.update_layout(**_CHART_LAYOUT, yaxis=dict(range=[0, 105]), yaxis_title="Score")
+        st.plotly_chart(fig_score, use_container_width=True)
+
+    with ch4:
+        st.markdown("#### 🧠 Token Usage")
+        fig_tok = go.Figure()
+        fig_tok.add_trace(go.Bar(
+            name="Prompt",     x=labels_, y=p_toks,
+            marker_color="#6366f1", text=p_toks, textposition="inside",
+        ))
+        fig_tok.add_trace(go.Bar(
+            name="Completion", x=labels_, y=c_toks,
+            marker_color="#10b981", text=c_toks, textposition="inside",
+        ))
+        fig_tok.update_layout(**_CHART_LAYOUT, barmode="stack", yaxis_title="Tokens")
+        st.plotly_chart(fig_tok, use_container_width=True)
+
+    # ── Faithfulness Accuracy Radar ───────────────────────────────────────────────
+    st.divider()
+    st.markdown("### 🎯 Retrieval Accuracy / Faithfulness")
+    acc_col1, acc_col2 = st.columns([1, 1], gap="large")
+    with acc_col1:
+        fig_acc = go.Figure(go.Bar(
+            x=labels_, y=accurs,
+            marker_color=colors_,
+            text=[f"{v:.1f}%" for v in accurs],
+            textposition="auto",
+        ))
+        fig_acc.update_layout(
+            **_CHART_LAYOUT,
+            yaxis=dict(range=[0, 105], title="Accuracy %"),
+            title="Faithfulness Score (LLM Graded)",
+        )
+        st.plotly_chart(fig_acc, use_container_width=True)
+    with acc_col2:
+        st.markdown("**Evaluator Reasoning**")
+        for pname, pdata in providers_data.items():
+            reasoning = pdata.get("evaluation_reasoning", "")
+            score_v   = pdata.get("retrieval_accuracy", 0)
+            color     = _PROVIDER_COLORS.get(pname, "#94a3b8")
+            st.markdown(
+                f"""
+                <div style="border-left: 3px solid {color}; padding: 8px 12px; margin-bottom: 10px;
+                            background: rgba(255,255,255,0.03); border-radius: 4px;">
+                    <b style="color:{color};">{_provider_badge(pname)}</b>
+                    &nbsp;<span style="font-size:0.9rem;">Accuracy: {score_v:.0f}%</span><br/>
+                    <span style="font-size:0.85rem; color:#cbd5e1;">{reasoning}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.divider()
+
+    # ── Side-by-Side Response Comparison ──────────────────────────────────────────
+    st.markdown("### 📝 Side-by-Side Response Comparison")
+    comp_cols = st.columns(len(providers_data), gap="medium")
+    for col, (pname, pdata) in zip(comp_cols, providers_data.items()):
+        color = _PROVIDER_COLORS.get(pname, "#94a3b8")
+        err   = pdata.get("error")
+        with col:
+            st.markdown(
+                f"""
+                <div style="border: 1px solid {color}44; border-radius: 10px; padding: 12px 14px;
+                            background: rgba(255,255,255,0.02);">
+                    <div style="font-size:1.05rem; font-weight:600; color:{color}; margin-bottom: 6px;">
+                        {_provider_badge(pname)}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">
+                        {pdata.get('model', '-')}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if err:
+                st.error(f"Error: {err}")
+            else:
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Latency", f"{pdata.get('latency_s', 0):.2f}s")
+                c2.metric("Score",   f"{pdata.get('composite_score', 0):.1f}")
+                c3.metric("Words",   pdata.get("response_length_words", 0))
+
+                c4, c5 = st.columns(2)
+                c4.metric("Tokens",  pdata.get("total_tokens", 0))
+                c5.metric("Cost",    f"${pdata.get('cost_usd', 0):.6f}")
+
+                response_text = pdata.get("response", "")
+                st.markdown(
+                    f"""
+                    <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 8px;
+                                padding: 12px; margin-top: 8px; font-size: 0.83rem;
+                                color: #e2e8f0; max-height: 400px; overflow-y: auto;
+                                line-height: 1.55; white-space: pre-wrap;">
+                        {response_text.replace('<', '&lt;').replace('>', '&gt;')}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    st.divider()
+    _render_benchmark_history()
+
+
+def _render_benchmark_history() -> None:
+    """Collapsible section showing all past benchmark runs with reload support."""
+    st.markdown("### 🗓 Benchmark History")
+
+    hist_resp = api_get("/benchmark/history", timeout=10.0)
+    hist_runs = (hist_resp or {}).get("runs", [])
+
+    if not hist_runs:
+        st.info("No benchmark history yet. Run your first benchmark above!")
+        return
+
+    st.caption(f"{len(hist_runs)} run(s) stored locally.")
+
+    clear_col, _ = st.columns([1, 3])
+    if clear_col.button("🗑 Clear Benchmark History", type="secondary", key="clear_bench_hist"):
+        with st.spinner("Clearing…"):
+            import httpx, os
+            try:
+                with httpx.Client(base_url=os.getenv("API_BASE_URL", "http://localhost:8000"), timeout=10.0) as cli:
+                    cli.delete("/benchmark/history")
+                st.session_state.benchmark_result = None
+                st.success("History cleared.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Failed: {exc}")
+
+    for i, run in enumerate(reversed(hist_runs)):
+        ts  = run.get("timestamp", "")[:19].replace("T", " ")
+        qry = run.get("query", "")[:80]
+        rag = "📚 RAG" if run.get("use_rag") else ""
+        with st.expander(f"📅 {ts} {rag} — {qry}…", expanded=(i == 0)):
+            hist_results = run.get("results", {})
+
+            # Mini leaderboard
+            mini_rows = []
+            for pname, pdata in hist_results.items():
+                mini_rows.append({
+                    "Provider":    _provider_badge(pname),
+                    "Latency":     f"{pdata.get('latency_s', 0):.2f}s",
+                    "Tokens":      pdata.get("total_tokens", 0),
+                    "Cost":        f"${pdata.get('cost_usd', 0):.7f}",
+                    "Accuracy %":  f"{pdata.get('retrieval_accuracy', 0):.0f}%",
+                    "⭐ Score":    pdata.get("composite_score", 0),
+                    "Error":       pdata.get("error") or "",
+                })
+            mini_rows.sort(key=lambda x: x["⭐ Score"], reverse=True)
+            st.dataframe(pd.DataFrame(mini_rows), use_container_width=True, hide_index=True)
+
+            if st.button("🔄 Load This Run", key=f"reload_hist_{i}", use_container_width=True):
+                st.session_state.benchmark_result = run
+                st.rerun()
+
+
 # ── Main entrypoint ────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1542,6 +1876,8 @@ def main() -> None:
         render_workflow()
     elif page == "analytics":
         render_analytics()
+    elif page == "benchmark":
+        render_benchmark()
 
 
 if __name__ == "__main__":

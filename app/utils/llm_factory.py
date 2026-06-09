@@ -33,6 +33,40 @@ logger = get_logger(__name__)
 
 # ── LLM factory ───────────────────────────────────────────────────────────────
 
+def get_provider_llm(
+    provider: str,
+    temperature: float | None = None,
+    max_output_tokens: int | None = None,
+) -> BaseChatModel:
+    """
+    Build and return a chat LLM for a *specific* provider name, bypassing the
+    ``LLM_PROVIDER`` setting.  Used by the benchmark runner to call all
+    providers in parallel regardless of the active configuration.
+
+    Args:
+        provider:          One of ``groq``, ``gemini``, ``ollama``.
+        temperature:       Override temperature (defaults to settings.gemini_temperature).
+        max_output_tokens: Override max output tokens.
+
+    Raises:
+        ValueError: If the provider name is unsupported.
+    """
+    settings = get_settings()
+    temp = temperature if temperature is not None else settings.gemini_temperature
+    max_tok = max_output_tokens or settings.gemini_max_output_tokens
+    p = provider.lower()
+    if p == "groq":
+        return _build_groq_llm(settings, temp, max_tok)
+    elif p == "gemini":
+        return _build_gemini_llm(settings, temp, max_tok)
+    elif p == "ollama":
+        return _build_ollama_llm(settings, temp, max_tok)
+    else:
+        raise ValueError(
+            f"Unsupported provider '{provider}'. Choose from: groq, gemini, ollama"
+        )
+
+
 def get_llm(
     temperature: float | None = None,
     max_output_tokens: int | None = None,
@@ -287,17 +321,34 @@ def calculate_cost(prompt_tokens: int, completion_tokens: int) -> float:
     """
     settings = get_settings()
     provider = settings.llm_provider.lower()
-    
-    if provider == "gemini":
-        # Gemini 2.0 Flash pricing: $0.075 / 1M input tokens, $0.30 / 1M output tokens
-        input_rate = 0.075 / 1_000_000
-        output_rate = 0.30 / 1_000_000
-        return (prompt_tokens * input_rate) + (completion_tokens * output_rate)
-    elif provider == "groq":
-        # Groq llama-3.1-8b-instant pricing: $0.05 / 1M input tokens, $0.08 / 1M output tokens
-        input_rate = 0.05 / 1_000_000
-        output_rate = 0.08 / 1_000_000
-        return (prompt_tokens * input_rate) + (completion_tokens * output_rate)
-    # Ollama is local and completely free ($0)
-    return 0.0
+    return calculate_provider_cost(provider, prompt_tokens, completion_tokens)
+
+
+# ── Per-provider pricing tables ────────────────────────────────────────────────
+# Rates as of 2025 — update when providers change their pricing.
+_PRICING: dict[str, tuple[float, float]] = {
+    # provider → (input_rate_per_token, output_rate_per_token)  [USD]
+    "gemini": (0.075 / 1_000_000, 0.30 / 1_000_000),   # Gemini 2.0 Flash
+    "groq":   (0.05  / 1_000_000, 0.08 / 1_000_000),   # Groq llama-3.1-8b-instant
+    "ollama": (0.0,               0.0),                  # Local — free
+}
+
+
+def calculate_provider_cost(
+    provider: str, prompt_tokens: int, completion_tokens: int
+) -> float:
+    """
+    Calculate cost in USD for a *specific* provider and token counts.
+    Used by the benchmark runner to compute per-provider cost estimates.
+
+    Args:
+        provider:          One of ``groq``, ``gemini``, ``ollama``.
+        prompt_tokens:     Number of tokens in the prompt.
+        completion_tokens: Number of tokens in the completion.
+
+    Returns:
+        Estimated cost in USD (0.0 for Ollama).
+    """
+    input_rate, output_rate = _PRICING.get(provider.lower(), (0.0, 0.0))
+    return (prompt_tokens * input_rate) + (completion_tokens * output_rate)
 

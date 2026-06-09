@@ -415,3 +415,34 @@ class RetrievalMetric(BaseModel):
     completion_tokens: int = 0
     total_tokens: int = 0
     cost_usd: float = 0.0
+
+
+# ── LLM Benchmark ─────────────────────────────────────────────────────────────
+
+class BenchmarkProviderResult(BaseModel):
+    """The benchmark result for a single LLM provider."""
+    provider: str = Field(..., description="LLM provider: ollama | groq | gemini")
+    model: str = Field(..., description="Model name used")
+    response: str = Field(..., description="LLM generated answer text")
+    latency_s: float = Field(..., description="Response latency in seconds")
+    prompt_tokens: int = Field(default=0, description="Number of prompt tokens")
+    completion_tokens: int = Field(default=0, description="Number of completion tokens")
+    total_tokens: int = Field(default=0, description="Total tokens used")
+    cost_usd: float = Field(default=0.0, description="Estimated cost of the call in USD")
+    response_length_chars: int = Field(default=0, description="Character count of the response")
+    response_length_words: int = Field(default=0, description="Word count of the response")
+    retrieval_accuracy: float = Field(default=100.0, description="Retrieval accuracy / faithfulness score [0-100]")
+    evaluation_reasoning: str = Field(default="", description="Reasoning for the retrieval accuracy score")
+    citations: list[str] = Field(default_factory=list, description="Citations parsed from response")
+    error: str | None = Field(default=None, description="Error message if the call failed")
+    composite_score: float = Field(default=0.0, description="Performance score [0-100] calculated for the leaderboard")
+
+
+class BenchmarkRun(BaseModel):
+    """A complete benchmark run across all providers for a single query."""
+    run_id: str = Field(default_factory=lambda: uuid4().hex, description="Unique benchmark run identifier")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Timestamp of benchmark run")
+    query: str = Field(..., description="The prompt query tested")
+    context_retrieved: str = Field(default="", description="Retrieved context injected in prompt (if RAG enabled)")
+    use_rag: bool = Field(default=False, description="Whether hybrid document retrieval was enabled")
+    results: dict[str, BenchmarkProviderResult] = Field(..., description="Results mapped by provider name")
