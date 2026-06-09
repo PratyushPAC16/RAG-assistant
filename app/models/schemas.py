@@ -182,6 +182,18 @@ class ConversationMemory(BaseModel):
         """Return the last *n* messages from history."""
         return self.messages[-n:] if n < len(self.messages) else self.messages
 
+# ── Long-Term Memory ──────────────────────────────────────────────────────────
+
+class MemoryRecord(BaseModel):
+    """A single fact, preference, or summary stored in long-term memory."""
+
+    memory_id: str = Field(..., description="Unique memory identifier")
+    content: str = Field(..., description="Text content of the memory")
+    memory_type: str = Field(..., description="Type of memory: fact | preference | summary")
+    session_id: str = Field(default="", description="Session from which this memory was extracted")
+    score: float | None = Field(default=None, description="Similarity score from search")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Time of memory extraction")
+
 
 # ── Routing Decision ─────────────────────────────────────────────────────────
 
@@ -250,6 +262,7 @@ class AgentState(BaseModel):
     total_tokens: int = Field(default=0, description="Sum of total tokens used across LLM calls")
     cost_usd: float = Field(default=0.0, description="Estimated cost of LLM calls in USD")
     filter_document_ids: list[str] | None = Field(default=None, description="Optional list of document IDs to restrict retrieval")
+    retrieved_memories: list[MemoryRecord] = Field(default_factory=list, description="Memories retrieved for this query")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -315,6 +328,7 @@ class ChatResponse(BaseModel):
     completion_tokens: int = Field(default=0, description="Sum of completion tokens used across LLM calls")
     total_tokens: int = Field(default=0, description="Sum of total tokens used across LLM calls")
     cost_usd: float = Field(default=0.0, description="Estimated cost of LLM calls in USD")
+    retrieved_memories: list[MemoryRecord] = Field(default_factory=list, description="Memories retrieved for this query")
 
 
 class DocumentListResponse(BaseModel):

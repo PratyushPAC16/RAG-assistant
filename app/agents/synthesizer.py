@@ -79,6 +79,17 @@ class ResponseSynthesizer:
             context_parts = []
 
             # Document chunks
+            if getattr(state, "retrieved_memories", None):
+                mem_context = []
+                for mem in state.retrieved_memories:
+                    m_type = getattr(mem, "memory_type", "") or (mem.get("memory_type", "") if isinstance(mem, dict) else "")
+                    m_content = getattr(mem, "content", "") or (mem.get("content", "") if isinstance(mem, dict) else "")
+                    if not m_type and not isinstance(mem, dict):
+                        m_type = mem.memory_type
+                        m_content = mem.content
+                    mem_context.append(f"- [{m_type.upper()}] {m_content}")
+                context_parts.append("### RELEVANT LONG-TERM USER MEMORIES & PREFERENCES:\n" + "\n".join(mem_context))
+
             if state.reranked_chunks:
                 doc_context = []
                 for i, chunk in enumerate(state.reranked_chunks, start=1):

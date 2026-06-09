@@ -203,6 +203,71 @@ def api_delete(path: str, timeout: float = 30.0) -> dict[str, Any] | None:
 
 # ── Session state initialisation ───────────────────────────────────────────────
 
+# ── Session state initialisation ───────────────────────────────────────────────
+
+def load_session_history_into_state(session_id: str) -> None:
+    """Fetch conversation from API and load into Streamlit session state."""
+    resp = api_get(f"/chat/session/{session_id}/export?format=json")
+    if resp and "messages" in resp:
+        st.session_state.session_id = session_id
+        history = []
+        for m in resp["messages"]:
+            role = m["role"]
+            content = m["content"]
+            if role == "user":
+                history.append({"role": "user", "content": content})
+            else:
+                agent = m.get("agent_type") or "rag"
+                meta = m.get("metadata") or {}
+                latency_ms = meta.get("latency_ms", {})
+                total_ms = latency_ms.get("total", 0)
+                latency_label = f"⏱ {total_ms:.0f}ms" if total_ms else ""
+                
+                history.append({
+                    "role": "assistant",
+                    "content": content,
+                    "agent": agent,
+                    "sources": meta.get("sources", []),
+                    "latency": latency_label,
+                    "routing_decision": meta.get("routing_decision"),
+                    "routing_trace": meta.get("routing_trace", []),
+                    "prompt_tokens": meta.get("prompt_tokens", 0),
+                    "completion_tokens": meta.get("completion_tokens", 0),
+                    "total_tokens": meta.get("total_tokens", 0),
+                    "cost_usd": meta.get("cost_usd", 0.0),
+                    "retrieved_memories": meta.get("retrieved_memories", []),
+                })
+        st.session_state.chat_history = history
+
+
+def export_history_to_markdown(session_id: str, chat_history: list[dict]) -> str:
+    """Format chat history as a Markdown document."""
+    lines = [f"# Chat Conversation: {session_id}", ""]
+    for i, turn in enumerate(chat_history, start=1):
+        role = turn.get("role")
+        content = turn.get("content", "")
+        if role == "user":
+            lines.append(f"### Turn {i} - **User**")
+        else:
+            agent = str(turn.get("agent", "rag")).upper()
+            latency = turn.get("latency", "")
+            lines.append(f"### Turn {i} - **Assistant ({agent})** - *{latency}*")
+        lines.append(content)
+        lines.append("")
+    return "\n".join(lines)
+
+
+import json
+
+def export_history_to_json(session_id: str, chat_history: list[dict]) -> str:
+    """Format chat history as a JSON string."""
+    data = {
+        "session_id": session_id,
+        "messages": chat_history
+    }
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
 def init_session_state() -> None:
     defaults = {
         "session_id": None,
@@ -257,15 +322,22 @@ def render_sidebar() -> str:
         pages = {
             "🏠 Dashboard": "dashboard",
             "💬 Chat": "chat",
+            "🧠 Memory": "memory_dashboard",
             "🔀 Workflow": "workflow",
             "📊 Analytics": "analytics",
         }
+        
+        page_vals = list(pages.values())
+        default_idx = page_vals.index(st.session_state.page) if st.session_state.page in page_vals else 0
+        
         selected_label = st.radio(
             "Navigation",
             list(pages.keys()),
+            index=default_idx,
             label_visibility="collapsed",
         )
         page = pages[selected_label]
+        st.session_state.page = page
 
         st.divider()
 
@@ -276,7 +348,40 @@ def render_sidebar() -> str:
         if st.button("🔄 New Session", use_container_width=True):
             st.session_state.session_id = None
             st.session_state.chat_history = []
+            st.session_state.page = "chat"
             st.rerun()
+
+        st.divider()
+
+        # Past Conversations list
+        with st.expander("📁 Past Conversations", expanded=True):
+            sessions_resp = api_get("/chat/sessions")
+            if sessions_resp:
+                for s in sessions_resp:
+                    sid = s["session_id"]
+                    title = s["title"]
+                    msg_count = s.get("message_count", 0)
+                    
+                    display_title = title if len(title) <= 22 else f"{title[:20]}..."
+                    label = f"{display_title} ({msg_count})"
+                    
+                    is_current = (st.session_state.session_id == sid)
+                    button_type = "primary" if is_current else "secondary"
+                    
+                    col_btn, col_del = st.columns([5, 1.2])
+                    if col_btn.button(label, key=f"sess_btn_{sid}", use_container_width=True, type=button_type):
+                        load_session_history_into_state(sid)
+                        st.session_state.page = "chat"
+                        st.rerun()
+                    
+                    if col_del.button("🗑️", key=f"sess_del_{sid}", help="Delete this conversation"):
+                        api_delete(f"/chat/session/{sid}")
+                        if st.session_state.session_id == sid:
+                            st.session_state.session_id = None
+                            st.session_state.chat_history = []
+                        st.rerun()
+            else:
+                st.caption("No past sessions.")
 
         st.divider()
 
@@ -404,10 +509,39 @@ def render_dashboard() -> None:
 # ── Page: Chat ────────────────────────────────────────────────────────────────
 
 def render_chat() -> None:
-    st.markdown(
-        '<div class="section-header">💬 Agentic Chat</div>',
-        unsafe_allow_html=True,
-    )
+    col_title, col_clear, col_exp_md, col_exp_json = st.columns([4.5, 1.5, 1.5, 1.5])
+    with col_title:
+        st.markdown(
+            '<div class="section-header">💬 Agentic Chat</div>',
+            unsafe_allow_html=True,
+        )
+    
+    if st.session_state.session_id and st.session_state.chat_history:
+        if col_clear.button("🗑️ Clear Chat", use_container_width=True, help="Delete and clear current conversation"):
+            api_delete(f"/chat/session/{st.session_state.session_id}")
+            st.session_state.session_id = None
+            st.session_state.chat_history = []
+            st.rerun()
+            
+        md_data = export_history_to_markdown(st.session_state.session_id, st.session_state.chat_history)
+        col_exp_md.download_button(
+            label="📥 Export MD",
+            data=md_data,
+            file_name=f"chat_{st.session_state.session_id[:8]}.md",
+            mime="text/markdown",
+            use_container_width=True,
+            help="Download chat history as Markdown",
+        )
+        
+        json_data = export_history_to_json(st.session_state.session_id, st.session_state.chat_history)
+        col_exp_json.download_button(
+            label="📥 Export JSON",
+            data=json_data,
+            file_name=f"chat_{st.session_state.session_id[:8]}.json",
+            mime="application/json",
+            use_container_width=True,
+            help="Download chat history as JSON",
+        )
 
     # Settings bar
     with st.expander("⚙️ Chat Settings & Document Filters", expanded=False):
@@ -531,6 +665,20 @@ def render_chat() -> None:
                             for step in routing_trace:
                                 st.markdown(f"- {step}")
 
+                # Retrieved Memories from Long-Term Memory
+                retrieved_mems = turn.get("retrieved_memories", [])
+                if retrieved_mems:
+                    with st.expander("🧠 Retrieved Long-Term Memories", expanded=False):
+                        mem_rows = []
+                        for m in retrieved_mems:
+                            mem_rows.append({
+                                "Content": m.get("content"),
+                                "Type": m.get("memory_type", "").upper(),
+                                "Relevance Score": f"{m.get('score', 1.0):.4f}" if m.get("score") is not None else "1.0000",
+                                "Source Session": m.get("session_id", "")[:8] + "...",
+                            })
+                        st.dataframe(pd.DataFrame(mem_rows), use_container_width=True, hide_index=True)
+
     # ── Input bar ──────────────────────────────────────────────────────────────
     query = st.chat_input("Ask about your documents, current events, or follow up on previous answers…")
 
@@ -568,6 +716,7 @@ def render_chat() -> None:
                     "completion_tokens": result.get("completion_tokens", 0),
                     "total_tokens": result.get("total_tokens", 0),
                     "cost_usd": result.get("cost_usd", 0.0),
+                    "retrieved_memories": result.get("retrieved_memories", []),
                 }
             )
 
@@ -1067,6 +1216,131 @@ def render_workflow() -> None:
         st.info("No query routing records found yet.")
 
 
+# ── Page: Long-Term Memory Dashboard ───────────────────────────────────────────
+
+def render_memory_dashboard() -> None:
+    st.markdown(
+        '<div class="section-header">🧠 Long-Term Memory Dashboard</div>',
+        unsafe_allow_html=True,
+    )
+    
+    st.markdown(
+        """
+        Long-Term Memory holds user preferences, extracted facts, and previous conversation summaries 
+        persisted in ChromaDB. Matching memories are retrieved and injected into the LLM context 
+        before document/web search retrieval.
+        """
+    )
+    
+    # Fetch all memories
+    memories = api_get("/memories")
+    if memories is None:
+        memories = []
+        
+    total_memories = len(memories)
+    facts_count = sum(1 for m in memories if m.get("memory_type") == "fact")
+    pref_count = sum(1 for m in memories if m.get("memory_type") == "preference")
+    sum_count = sum(1 for m in memories if m.get("memory_type") == "summary")
+    
+    # ── KPIs Row ──
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Memories", total_memories)
+    c2.metric("Facts Stored", facts_count)
+    c3.metric("Preferences Stored", pref_count)
+    c4.metric("Turn Summaries", sum_count)
+    
+    st.divider()
+    
+    # ── Search & Test Retrieval Section ──
+    st.markdown("### 🔍 Test Memory Retrieval")
+    search_col1, search_col2 = st.columns([4, 1])
+    test_query = search_col1.text_input("Enter a query to test what memories will be retrieved", placeholder="e.g. What is my project name?")
+    search_btn = search_col2.button("🔍 Retrieve Memories", use_container_width=True)
+    
+    if test_query and (search_btn or test_query.strip()):
+        with st.spinner("Retrieving matching memories..."):
+            matched_mems = api_get(f"/memories/search?query={test_query}")
+        if matched_mems:
+            st.success(f"Found {len(matched_mems)} matching memories above the similarity threshold (0.45):")
+            
+            # Format and show as table
+            match_rows = []
+            for m in matched_mems:
+                match_rows.append({
+                    "Memory Content": m.get("content"),
+                    "Type": m.get("memory_type", "").upper(),
+                    "Similarity Score": f"{m.get('score', 0.0):.4f}",
+                    "Session Source": m.get("session_id", "")[:8] + "...",
+                    "Date Extracted": m.get("timestamp")[:16].replace("T", " ") if m.get("timestamp") else "N/A"
+                })
+            st.dataframe(pd.DataFrame(match_rows), use_container_width=True, hide_index=True)
+        else:
+            st.info("No matching memories found for this query above the similarity threshold.")
+            
+    st.divider()
+    
+    # ── Stored Memories Table ──
+    st.markdown("### 📋 Stored Memories in ChromaDB")
+    if not memories:
+        st.info("No long-term memories stored yet. Start chatting to extract memories!")
+    else:
+        # Show all memories table
+        rows = []
+        for m in memories:
+            rows.append({
+                "Memory ID": m.get("memory_id"),
+                "Memory Content": m.get("content"),
+                "Type": m.get("memory_type", "").upper(),
+                "Session Source": m.get("session_id", "")[:8] + "...",
+                "Date Extracted": m.get("timestamp")[:16].replace("T", " ") if m.get("timestamp") else "N/A"
+            })
+        
+        df_mem = pd.DataFrame(rows)
+        
+        # Table Header
+        th1, th2, th3, th4, th5 = st.columns([1.5, 5, 1.5, 2, 1.5])
+        th1.markdown("**Memory ID**")
+        th2.markdown("**Memory Content**")
+        th3.markdown("**Type**")
+        th4.markdown("**Date Extracted**")
+        th5.markdown("**Action**")
+        st.markdown("<hr style='margin: 4px 0; border-color: #334155 !important;' />", unsafe_allow_html=True)
+        
+        for idx, row in df_mem.iterrows():
+            r1, r2, r3, r4, r5 = st.columns([1.5, 5, 1.5, 2, 1.5])
+            r1.write(f"`{row['Memory ID']}`")
+            r2.write(row["Memory Content"])
+            r3.write(row["Type"])
+            r4.write(row["Date Extracted"])
+            
+            if r5.button("🗑️", key=f"del_mem_{row['Memory ID']}", help=f"Delete memory {row['Memory ID']}"):
+                with st.spinner("Deleting memory..."):
+                    api_delete(f"/memories/{row['Memory ID']}")
+                st.success("Memory deleted!")
+                st.rerun()
+                
+        st.divider()
+        
+        # ── Danger Zone ──
+        st.markdown("### ⚠️ Danger Zone")
+        with st.container():
+            st.markdown(
+                """
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgb(239, 68, 68); border-radius: 8px; padding: 15px;">
+                    <h5 style="color: rgb(239, 68, 68); margin-top:0;">Clear Long-Term Memory Store</h5>
+                    <p style="font-size:0.85rem; color:#cbd5e1; margin-bottom:12px;">Wipe out all stored preferences, facts, and turn summaries from the ChromaDB collection. This action cannot be undone.</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            st.write("") # spacing
+            if st.button("🚨 Clear All Memories", type="primary", use_container_width=True):
+                with st.spinner("Clearing memories database..."):
+                    api_delete("/memories")
+                st.success("Memory database successfully cleared.")
+                st.rerun()
+
+
 # ── Main entrypoint ────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1077,6 +1351,8 @@ def main() -> None:
         render_dashboard()
     elif page == "chat":
         render_chat()
+    elif page == "memory_dashboard":
+        render_memory_dashboard()
     elif page == "workflow":
         render_workflow()
     elif page == "analytics":

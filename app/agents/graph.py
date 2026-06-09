@@ -19,7 +19,7 @@ from app.agents.memory_agent import MemoryAgent, get_memory_agent
 from app.agents.rag_agent import RAGAgent, get_rag_agent
 from app.agents.router import RouterAgent, get_router
 from app.agents.web_agent import WebSearchAgent, get_web_agent
-from app.models.schemas import AgentState, AgentType, ChatMessage, MessageRole, RoutingDecision
+from app.models.schemas import AgentState, AgentType, ChatMessage, MessageRole, RoutingDecision, MemoryRecord
 from app.utils.config import get_settings
 from app.utils.logger import get_logger, log_latency
 
@@ -35,6 +35,24 @@ def merge_latency(left: dict[str, float] | None, right: dict[str, float] | None)
         res.update(left)
     if right:
         res.update(right)
+    return res
+
+
+def merge_memories(left: list[Any] | None, right: list[Any] | None) -> list[Any]:
+    if not left:
+        return right or []
+    if not right:
+        return left or []
+    seen = set()
+    res = []
+    for m in (left + right):
+        mid = getattr(m, "memory_id", None) if not isinstance(m, dict) else m.get("memory_id")
+        if mid:
+            if mid not in seen:
+                seen.add(mid)
+                res.append(m)
+        else:
+            res.append(m)
     return res
 
 
@@ -137,6 +155,7 @@ class GraphState(TypedDict):
     total_tokens: Annotated[int, merge_add_int]
     cost_usd: Annotated[float, merge_add_float]
     filter_document_ids: Annotated[list[str] | None, merge_filter_document_ids]
+    retrieved_memories: Annotated[list[Any], merge_memories]
 
 
 
@@ -149,6 +168,52 @@ def _dict_to_state(d: dict[str, Any]) -> AgentState:
 
 
 # ── Node functions ─────────────────────────────────────────────────────────────
+
+def memory_retriever_node(state: dict[str, Any]) -> dict[str, Any]:
+    """
+    LangGraph node: retrieve relevant memories from long-term memory store.
+    """
+    from datetime import datetime
+    agent_state = _dict_to_state(state)
+    agent_state.routing_trace.append("🧠 Long-Term Memory: searching for relevant user preferences and facts…")
+    
+    from app.rag.memory_store import get_memory_store
+    from app.models.schemas import MemoryRecord
+    
+    store = get_memory_store()
+    results = store.search_memories(agent_state.query, top_k=5, score_threshold=0.45)
+    
+    retrieved_memories = []
+    for r in results:
+        ts = r["timestamp"]
+        if isinstance(ts, str):
+            try:
+                dt = datetime.fromisoformat(ts)
+            except ValueError:
+                dt = datetime.utcnow()
+        else:
+            dt = ts or datetime.utcnow()
+            
+        retrieved_memories.append(MemoryRecord(
+            memory_id=r["memory_id"],
+            content=r["content"],
+            memory_type=r["memory_type"],
+            session_id=r["session_id"],
+            score=r["score"],
+            timestamp=dt
+        ))
+    
+    agent_state.retrieved_memories = retrieved_memories
+    if retrieved_memories:
+        trace_entry = f"🧠 Long-Term Memory: found {len(retrieved_memories)} relevant memory/memories"
+    else:
+        trace_entry = "🧠 Long-Term Memory: no relevant memories found"
+        
+    serialized = _state_to_dict(agent_state)
+    serialized["routing_trace"] = [trace_entry]
+    serialized["retrieved_memories"] = [m.model_dump(mode="json") for m in retrieved_memories]
+    return serialized
+
 
 def router_node(state: dict[str, Any]) -> dict[str, Any]:
     """
@@ -330,6 +395,7 @@ def build_graph() -> Any:
     graph = StateGraph(GraphState)
 
     # ── Add nodes ──────────────────────────────────────────────────────────────
+    graph.add_node("memory_retriever_node", memory_retriever_node)
     graph.add_node("router_node", router_node)
     graph.add_node("rag_node", rag_node)
     graph.add_node("web_node", web_node)
@@ -338,7 +404,8 @@ def build_graph() -> Any:
     graph.add_node("formatter_node", formatter_node)
 
     # ── Entry edge ─────────────────────────────────────────────────────────────
-    graph.add_edge(START, "router_node")
+    graph.add_edge(START, "memory_retriever_node")
+    graph.add_edge("memory_retriever_node", "router_node")
 
     # ── Conditional routing edge ───────────────────────────────────────────────
     graph.add_conditional_edges(
@@ -439,12 +506,34 @@ class AgentOrchestrator:
             content=query,
         )
         if final_state.answer:
+            metadata = {
+                "sources": [s.model_dump() for s in final_state.sources],
+                "latency_ms": final_state.latency_ms,
+                "routing_decision": final_state.routing_decision.model_dump() if final_state.routing_decision else None,
+                "routing_trace": final_state.routing_trace,
+                "prompt_tokens": final_state.prompt_tokens,
+                "completion_tokens": final_state.completion_tokens,
+                "total_tokens": final_state.total_tokens,
+                "cost_usd": final_state.cost_usd,
+                "retrieved_memories": [m.model_dump(mode="json") for m in final_state.retrieved_memories],
+            }
             self._memory_agent.add_to_memory(
                 session_id=sid,
                 role=MessageRole.ASSISTANT,
                 content=final_state.answer,
                 agent_type=final_state.agent_type,
+                metadata=metadata,
             )
+
+        # ── Trigger Long-Term Memory Extraction ────────────────────────────────
+        if final_state.answer:
+            import threading
+            from app.utils.long_term_memory import extract_and_persist_memory
+            threading.Thread(
+                target=extract_and_persist_memory,
+                args=(sid, query, final_state.answer),
+                daemon=True,
+            ).start()
 
         logger.info(
             "Pipeline complete",

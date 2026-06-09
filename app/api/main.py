@@ -33,6 +33,7 @@ from app.models.schemas import (
     ScoreDistribution,
     SourceCitation,
     UploadResponse,
+    MemoryRecord,
 )
 from app.rag.document_processor import DocumentProcessor
 from app.rag.retriever import get_retriever
@@ -457,6 +458,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             completion_tokens=result.completion_tokens,
             total_tokens=result.total_tokens,
             cost_usd=result.cost_usd,
+            retrieved_memories=result.retrieved_memories,
         )
 
     except Exception as exc:
@@ -469,6 +471,134 @@ async def chat(request: ChatRequest) -> ChatResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process query: {exc}",
         )
+
+
+# ── Chat Memory Sessions ───────────────────────────────────────────────────────
+
+@app.get(
+    "/chat/sessions",
+    tags=["Chat"],
+    summary="List all persistent conversation sessions",
+)
+async def list_chat_sessions() -> list[dict]:
+    """
+    Retrieve metadata (session ID, title, last updated timestamp, message count)
+    for all conversation histories saved on disk.
+    """
+    from app.utils.memory_manager import get_memory_manager
+    return get_memory_manager().list_sessions()
+
+
+@app.delete(
+    "/chat/session/{session_id}",
+    tags=["Chat"],
+    summary="Delete a conversation session",
+)
+async def delete_chat_session(session_id: str) -> dict:
+    """
+    Clear conversation memory for a session ID and delete its persistent JSON file.
+    """
+    from app.agents.memory_agent import get_memory_agent
+    get_memory_agent().clear_session(session_id)
+    return {"session_id": session_id, "message": "Conversation memory cleared."}
+
+
+@app.get(
+    "/chat/session/{session_id}/export",
+    tags=["Chat"],
+    summary="Export conversation history",
+)
+async def export_chat_session(session_id: str, format: str = "json") -> dict:
+    """
+    Export the conversation history for a session ID.
+    Supports format: json (default) or markdown.
+    """
+    from app.utils.memory_manager import get_memory_manager
+    memory = get_memory_manager().load_session(session_id)
+    if not memory:
+        from app.agents.memory_agent import get_memory_agent
+        messages = get_memory_agent().get_session_history(session_id)
+        if not messages:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conversation session '{session_id}' not found.",
+            )
+        from app.models.schemas import ConversationMemory
+        memory = ConversationMemory(session_id=session_id, messages=messages)
+
+    if format.lower() == "markdown":
+        lines = [f"# Chat Conversation: {session_id}", ""]
+        for i, msg in enumerate(memory.messages, start=1):
+            role_label = "**User**" if msg.role.value == "user" else f"**Assistant ({msg.agent_type.value if msg.agent_type else 'RAG'})**"
+            ts_str = msg.timestamp.strftime("%Y-%m-%d %H:%M:%S") if msg.timestamp else ""
+            lines.append(f"### Turn {i} - {role_label} - *{ts_str}*")
+            lines.append(msg.content)
+            lines.append("")
+        md_text = "\n".join(lines)
+        return {"session_id": session_id, "format": "markdown", "content": md_text}
+
+    serialized_msgs = [msg.model_dump(mode="json") for msg in memory.messages]
+    return {
+        "session_id": session_id,
+        "format": "json",
+        "messages": serialized_msgs
+    }
+
+
+# ── Long-Term Memory endpoints ──────────────────────────────────────────────────
+
+@app.get(
+    "/memories",
+    tags=["Long-Term Memory"],
+    summary="List all long-term memories",
+)
+async def list_all_memories() -> list[dict]:
+    """
+    Retrieve all stored facts, preferences, and summaries from the ChromaDB long-term memory store.
+    """
+    from app.rag.memory_store import get_memory_store
+    return get_memory_store().list_all_memories()
+
+
+@app.get(
+    "/memories/search",
+    tags=["Long-Term Memory"],
+    summary="Search matching memories",
+)
+async def search_memories(query: str, top_k: int = 5) -> list[dict]:
+    """
+    Query memories matching the user query with similarity scores.
+    """
+    from app.rag.memory_store import get_memory_store
+    return get_memory_store().search_memories(query, top_k=top_k, score_threshold=0.45)
+
+
+@app.delete(
+    "/memories/{memory_id}",
+    tags=["Long-Term Memory"],
+    summary="Delete a specific long-term memory",
+)
+async def delete_memory(memory_id: str) -> dict:
+    """
+    Delete a specific fact/preference/summary from ChromaDB.
+    """
+    from app.rag.memory_store import get_memory_store
+    get_memory_store().delete_memory(memory_id)
+    return {"status": "success", "message": f"Memory {memory_id} deleted."}
+
+
+@app.delete(
+    "/memories",
+    tags=["Long-Term Memory"],
+    summary="Clear all long-term memories",
+)
+async def clear_all_memories() -> dict:
+    """
+    Wipe out the entire long-term memories database.
+    """
+    from app.rag.memory_store import get_memory_store
+    get_memory_store().clear_all()
+    return {"status": "success", "message": "All long-term memories cleared."}
 
 
 # ── Document list ──────────────────────────────────────────────────────────────
