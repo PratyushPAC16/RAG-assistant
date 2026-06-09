@@ -10,6 +10,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -93,14 +96,23 @@ class Settings(BaseSettings):
 
     # ── Retrieval Settings ────────────────────────────────────────
     retrieval_top_k: int = Field(
-        default=20, gt=0, description="Number of chunks to retrieve"
+        default=30, gt=0, description="Number of chunks to retrieve before reranking"
     )
     reranker_top_k: int = Field(
-        default=5, gt=0, description="Number of chunks after reranking"
+        default=5, gt=0, description="Number of chunks to return after cross-encoder reranking"
     )
     reranker_model: str = Field(
         default="cross-encoder/ms-marco-MiniLM-L6-v2",
-        description="Cross-encoder reranker model",
+        description="Cross-encoder reranker model (HuggingFace)",
+    )
+    rrf_k: int = Field(
+        default=60, gt=0, description="RRF constant k (from Cormack et al. 2009)"
+    )
+    semantic_weight: float = Field(
+        default=1.0, ge=0.0, description="Weight applied to semantic RRF scores"
+    )
+    bm25_weight: float = Field(
+        default=1.0, ge=0.0, description="Weight applied to BM25 RRF scores"
     )
 
     # ── Document Processing ───────────────────────────────────────

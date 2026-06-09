@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any
+from typing import Any, Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -19,7 +19,7 @@ from app.agents.memory_agent import MemoryAgent, get_memory_agent
 from app.agents.rag_agent import RAGAgent, get_rag_agent
 from app.agents.router import RouterAgent, get_router
 from app.agents.web_agent import WebSearchAgent, get_web_agent
-from app.models.schemas import AgentState, AgentType, ChatMessage, MessageRole
+from app.models.schemas import AgentState, AgentType, ChatMessage, MessageRole, RoutingDecision
 from app.utils.config import get_settings
 from app.utils.logger import get_logger, log_latency
 
@@ -28,8 +28,96 @@ settings = get_settings()
 
 
 # ── State type for LangGraph ───────────────────────────────────────────────────
-# LangGraph requires a TypedDict or plain dict; we use a wrapper that converts
-# our Pydantic AgentState to/from dict transparently.
+
+def merge_latency(left: dict[str, float] | None, right: dict[str, float] | None) -> dict[str, float]:
+    res = {}
+    if left:
+        res.update(left)
+    if right:
+        res.update(right)
+    return res
+
+
+def merge_agent_type(left: AgentType | str | None, right: AgentType | str | None) -> AgentType | str | None:
+    if left == AgentType.HYBRID or left == "hybrid" or right == AgentType.HYBRID or right == "hybrid":
+        return AgentType.HYBRID
+    if left and right and left != right:
+        return AgentType.HYBRID
+    return left or right
+
+
+def merge_retrieved_chunks(left: list[Any] | None, right: list[Any] | None) -> list[Any]:
+    if not left:
+        return right or []
+    if not right:
+        return left or []
+    seen = set()
+    res = []
+    for c in (left + right):
+        cid = getattr(c, "chunk_id", None) if not isinstance(c, dict) else c.get("chunk_id")
+        if cid:
+            if cid not in seen:
+                seen.add(cid)
+                res.append(c)
+        else:
+            res.append(c)
+    return res
+
+
+def merge_web_results(left: list[dict[str, Any]] | None, right: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    if not left:
+        return right or []
+    if not right:
+        return left or []
+    seen = set()
+    res = []
+    for item in (left + right):
+        url = item.get("url") if isinstance(item, dict) else getattr(item, "url", None)
+        if url:
+            if url not in seen:
+                seen.add(url)
+                res.append(item)
+        else:
+            res.append(item)
+    return res
+
+
+def merge_error(left: str | None, right: str | None) -> str | None:
+    if left and right:
+        if left == right:
+            return left
+        return f"{left}; {right}"
+    return left or right
+
+
+def merge_routing_trace(left: list[str] | None, right: list[str] | None) -> list[str]:
+    """Concatenate routing trace entries from parallel branches."""
+    return (left or []) + (right or [])
+
+
+def merge_routing_decision(
+    left: Any | None, right: Any | None
+) -> Any | None:
+    """Keep whichever routing decision is present (router sets it once)."""
+    return left if left is not None else right
+
+
+class GraphState(TypedDict):
+    query: str
+    session_id: str
+    agent_type: Annotated[AgentType | str | None, merge_agent_type]
+    retrieved_chunks: Annotated[list[Any], merge_retrieved_chunks]
+    reranked_chunks: Annotated[list[Any], merge_retrieved_chunks]
+    web_results: Annotated[list[dict[str, Any]], merge_web_results]
+    context: str
+    answer: str
+    sources: list[Any]
+    conversation_history: list[Any]
+    error: Annotated[str | None, merge_error]
+    latency_ms: Annotated[dict[str, float], merge_latency]
+    routing_decision: Annotated[Any | None, merge_routing_decision]
+    routing_trace: Annotated[list[str], merge_routing_trace]
+
 
 def _state_to_dict(state: AgentState) -> dict[str, Any]:
     return state.model_dump()
@@ -56,9 +144,24 @@ def rag_node(state: dict[str, Any]) -> dict[str, Any]:
     LangGraph node: run RAG pipeline (retrieve → rerank → generate).
     """
     agent_state = _dict_to_state(state)
+    agent_state.routing_trace.append("📚 RAG Agent: starting hybrid retrieval (ChromaDB + BM25)…")
     rag = get_rag_agent()
     updated = rag.run(agent_state)
-    return _state_to_dict(updated)
+    serialized = _state_to_dict(updated)
+    num_retrieved = len(serialized.get("retrieved_chunks", []))
+    num_reranked = len(serialized.get("reranked_chunks", []))
+    trace_entry = (
+        f"📚 RAG Agent: retrieved {num_retrieved} chunks, "
+        f"reranked to top {num_reranked}"
+    )
+    return {
+        "retrieved_chunks": serialized.get("retrieved_chunks", []),
+        "reranked_chunks": serialized.get("reranked_chunks", []),
+        "latency_ms": serialized.get("latency_ms", {}),
+        "agent_type": serialized.get("agent_type"),
+        "error": serialized.get("error"),
+        "routing_trace": [trace_entry],
+    }
 
 
 def web_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -66,9 +169,19 @@ def web_node(state: dict[str, Any]) -> dict[str, Any]:
     LangGraph node: run web search pipeline (Tavily → summarise).
     """
     agent_state = _dict_to_state(state)
+    agent_state.routing_trace.append("🌐 Web Search Agent: querying Tavily…")
     web = get_web_agent()
     updated = web.run(agent_state)
-    return _state_to_dict(updated)
+    serialized = _state_to_dict(updated)
+    num_results = len(serialized.get("web_results", []))
+    trace_entry = f"🌐 Web Search Agent: found {num_results} web results"
+    return {
+        "web_results": serialized.get("web_results", []),
+        "latency_ms": serialized.get("latency_ms", {}),
+        "agent_type": serialized.get("agent_type"),
+        "error": serialized.get("error"),
+        "routing_trace": [trace_entry],
+    }
 
 
 def memory_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -76,9 +189,18 @@ def memory_node(state: dict[str, Any]) -> dict[str, Any]:
     LangGraph node: answer using conversation memory.
     """
     agent_state = _dict_to_state(state)
+    agent_state.routing_trace.append("🧠 Memory Agent: retrieving conversation history…")
     memory = get_memory_agent()
     updated = memory.run(agent_state)
-    return _state_to_dict(updated)
+    serialized = _state_to_dict(updated)
+    trace_entry = "🧠 Memory Agent: context loaded from session history"
+    return {
+        "conversation_history": serialized.get("conversation_history", []),
+        "latency_ms": serialized.get("latency_ms", {}),
+        "agent_type": serialized.get("agent_type"),
+        "error": serialized.get("error"),
+        "routing_trace": [trace_entry],
+    }
 
 
 def formatter_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -103,8 +225,14 @@ def formatter_node(state: dict[str, Any]) -> dict[str, Any]:
     agent_state.sources = deduped
 
     # Total latency
-    total = sum(agent_state.latency_ms.values())
+    total = sum(v for k, v in agent_state.latency_ms.items() if not k.startswith("num_"))
     agent_state.latency_ms["total"] = round(total, 2)
+
+    # Final trace entry
+    agent_state.routing_trace.append(
+        f"✅ Pipeline complete | Agent: {(agent_state.agent_type or 'unknown')} | "
+        f"Sources: {len(agent_state.sources)} | Total: {total:.0f}ms"
+    )
 
     logger.info(
         "Response formatted",
@@ -112,6 +240,7 @@ def formatter_node(state: dict[str, Any]) -> dict[str, Any]:
             "agent": (agent_state.agent_type or "unknown"),
             "total_latency_ms": total,
             "num_sources": len(agent_state.sources),
+            "routing_trace_steps": len(agent_state.routing_trace),
         },
     )
 
@@ -123,10 +252,15 @@ def synthesizer_node(state: dict[str, Any]) -> dict[str, Any]:
     LangGraph node: synthesize responses from the gathered contexts.
     """
     agent_state = _dict_to_state(state)
+    agent_state.routing_trace.append("✨ Response Synthesizer: generating answer from context…")
     from app.agents.synthesizer import get_synthesizer
     synth = get_synthesizer()
     updated = synth.run(agent_state)
-    return _state_to_dict(updated)
+    serialized = _state_to_dict(updated)
+    num_sources = len(serialized.get("sources", []))
+    result = _state_to_dict(updated)
+    result["routing_trace"] = [f"✨ Response Synthesizer: answer generated with {num_sources} source(s)"]
+    return result
 
 
 def _routing_decision(state: dict[str, Any]) -> list[str]:
@@ -172,7 +306,7 @@ def build_graph() -> Any:
     Returns:
         Compiled LangGraph :class:`CompiledGraph` ready for ``.invoke()``.
     """
-    graph = StateGraph(dict)
+    graph = StateGraph(GraphState)
 
     # ── Add nodes ──────────────────────────────────────────────────────────────
     graph.add_node("router_node", router_node)

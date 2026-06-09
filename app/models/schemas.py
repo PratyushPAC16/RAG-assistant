@@ -181,6 +181,30 @@ class ConversationMemory(BaseModel):
         return self.messages[-n:] if n < len(self.messages) else self.messages
 
 
+# ── Routing Decision ─────────────────────────────────────────────────────────
+
+class RoutingDecision(BaseModel):
+    """
+    Captures the router's classification result with full traceability.
+    Stored in :class:`AgentState` so the UI can display routing decisions.
+    """
+
+    agent: str = Field(..., description="Chosen agent: rag | web | memory | hybrid")
+    reasoning: str = Field(
+        default="", description="One-sentence explanation from the LLM router"
+    )
+    confidence: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Router confidence score [0-1]"
+    )
+    fallback_used: bool = Field(
+        default=False, description="True if rule-based fallback was used instead of LLM"
+    )
+    num_docs_available: int = Field(
+        default=0, description="Number of chunks in vector store at routing time"
+    )
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
 # ── Agent State (LangGraph) ───────────────────────────────────────────────────
 
 class AgentState(BaseModel):
@@ -209,6 +233,14 @@ class AgentState(BaseModel):
     error: str | None = Field(default=None, description="Error message if any node failed")
     latency_ms: dict[str, float] = Field(
         default_factory=dict, description="Per-node latency tracking"
+    )
+    # ── Routing observability ─────────────────────────────────────
+    routing_decision: RoutingDecision | None = Field(
+        default=None, description="Full routing classification result"
+    )
+    routing_trace: list[str] = Field(
+        default_factory=list,
+        description="Step-by-step log of the routing and execution path",
     )
 
     model_config = {"arbitrary_types_allowed": True}
@@ -258,6 +290,14 @@ class ChatResponse(BaseModel):
     agent_used: AgentType
     session_id: str
     latency_ms: dict[str, float] = Field(default_factory=dict)
+    # ── Routing observability ─────────────────────────────────────
+    routing_decision: RoutingDecision | None = Field(
+        default=None, description="Router's classification result with reasoning"
+    )
+    routing_trace: list[str] = Field(
+        default_factory=list,
+        description="Step-by-step execution path through the LangGraph workflow",
+    )
 
 
 class DocumentListResponse(BaseModel):
@@ -288,17 +328,54 @@ class HealthResponse(BaseModel):
 
 # ── Analytics ─────────────────────────────────────────────────────────────────
 
-class RetrievalMetric(BaseModel):
-    """Single retrieval event logged for analytics."""
+class ScoreDistribution(BaseModel):
+    """Score statistics for one retrieval stage."""
+    min_score: float | None = None
+    max_score: float | None = None
+    mean_score: float | None = None
+    p50_score: float | None = None  # median
+    p90_score: float | None = None  # 90th percentile
 
+
+class RetrievalMetric(BaseModel):
+    """Single retrieval event with full pipeline observability."""
+
+    # ── Identity ──────────────────────────────────────────────────
     query: str
+    query_length: int = 0
     agent_type: AgentType
-    num_retrieved: int
-    num_reranked: int
-    retrieval_latency_ms: float
+    session_id: str | None = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    # ── Retrieval counts ──────────────────────────────────────────
+    num_vector_results: int = 0      # Raw results from ChromaDB
+    num_bm25_results: int = 0        # Raw results from BM25
+    num_retrieved: int = 0           # After RRF fusion
+    num_reranked: int = 0            # After cross-encoder reranking
+
+    # ── Stage latencies (ms) ──────────────────────────────────────
+    vector_search_latency_ms: float = 0.0
+    bm25_search_latency_ms: float = 0.0
+    rrf_fusion_latency_ms: float = 0.0
+    retrieval_latency_ms: float = 0.0     # Total hybrid retrieval
     reranking_latency_ms: float | None = None
     llm_latency_ms: float | None = None
-    total_latency_ms: float
+    total_latency_ms: float = 0.0
+
+    # ── Score distributions ───────────────────────────────────────
+    vector_score_distribution: ScoreDistribution = Field(
+        default_factory=ScoreDistribution
+    )
+    bm25_score_distribution: ScoreDistribution = Field(
+        default_factory=ScoreDistribution
+    )
+    rerank_score_distribution: ScoreDistribution = Field(
+        default_factory=ScoreDistribution
+    )
+    rrf_score_distribution: ScoreDistribution = Field(
+        default_factory=ScoreDistribution
+    )
+
+    # ── Final output ──────────────────────────────────────────────
     sources_used: list[str] = Field(default_factory=list)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    session_id: str | None = None
+    top_reranked_sources: list[str] = Field(default_factory=list)

@@ -13,7 +13,7 @@ import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.models.schemas import AgentState, AgentType
+from app.models.schemas import AgentState, AgentType, RoutingDecision
 from app.rag.vector_store import VectorStore, get_vector_store
 from app.utils.config import get_settings
 from app.utils.logger import get_logger, log_latency
@@ -89,25 +89,34 @@ class RouterAgent:
         """
         Classify the query and set ``state.agent_type``.
 
-        This node does NOT call the downstream agents — it only sets the routing
-        decision.  LangGraph uses the returned agent_type to select the next node.
+        Also populates ``state.routing_decision`` with the full classification
+        result (agent, reasoning, confidence) and appends step-by-step entries
+        to ``state.routing_trace`` for display in the UI.
 
         Args:
             state: Current :class:`~app.models.schemas.AgentState`.
 
         Returns:
-            State with ``agent_type`` set.
+            State with ``agent_type``, ``routing_decision``, and
+            ``routing_trace`` populated.
         """
         query = state.query
         logger.info("RouterAgent.route called", extra={"query": query[:80]})
+
+        state.routing_trace.append(f"⏳ Router received query ({len(query)} chars)")
 
         try:
             num_docs = self._vector_store.count()
             has_history = bool(state.conversation_history)
             history_preview = self._preview_history(state)
 
+            state.routing_trace.append(
+                f"📚 Knowledge base: {num_docs} chunks | "
+                f"Conversation history: {'yes' if has_history else 'no'}"
+            )
+
             with log_latency(logger, "routing", query=query) as route_ctx:
-                agent_type = self._classify(
+                agent_type, decision = self._classify_with_decision(
                     query=query,
                     num_docs=num_docs,
                     has_history=has_history,
@@ -116,9 +125,34 @@ class RouterAgent:
             state.latency_ms["routing"] = route_ctx.get("latency_ms", 0.0)
 
             state.agent_type = agent_type
+            state.routing_decision = decision
+
+            # Build a human-readable routing trace entry
+            agent_label = {
+                "rag": "RAG Agent 📚",
+                "web": "Web Search Agent 🌐",
+                "memory": "Memory Agent 🧠",
+                "hybrid": "Hybrid Workflow 🔀 (RAG + Web)",
+            }.get(agent_type.value, agent_type.value)
+
+            conf_pct = int(decision.confidence * 100)
+            fallback_note = " [rule-based fallback]" if decision.fallback_used else ""
+            state.routing_trace.append(
+                f"→ Route: **{agent_label}** | Confidence: {conf_pct}%{fallback_note}"
+            )
+            if decision.reasoning:
+                state.routing_trace.append(f"💬 Reason: {decision.reasoning}")
+
             logger.info(
                 "Query routed",
-                extra={"query": query[:80], "agent": agent_type.value},
+                extra={
+                    "query": query[:80],
+                    "agent": agent_type.value,
+                    "confidence": decision.confidence,
+                    "reasoning": decision.reasoning[:120] if decision.reasoning else "",
+                    "fallback_used": decision.fallback_used,
+                    "num_docs": num_docs,
+                },
             )
 
         except Exception as exc:
@@ -128,6 +162,16 @@ class RouterAgent:
                 exc_info=True,
             )
             state.agent_type = AgentType.RAG
+            state.routing_decision = RoutingDecision(
+                agent="rag",
+                reasoning="Routing failed — defaulting to RAG.",
+                confidence=0.5,
+                fallback_used=True,
+                num_docs_available=0,
+            )
+            state.routing_trace.append(
+                f"⚠️ Routing error: {str(exc)[:80]}. Defaulted to RAG Agent."
+            )
 
         return state
 
@@ -153,15 +197,17 @@ class RouterAgent:
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
-    def _classify(
+    def _classify_with_decision(
         self,
         query: str,
         num_docs: int,
         has_history: bool,
         history_preview: str,
-    ) -> AgentType:
+    ) -> tuple[AgentType, RoutingDecision]:
         """
-        Use Gemini to classify the query as rag / web / memory / hybrid.
+        Use the LLM to classify the query and return both the AgentType
+        and a populated :class:`RoutingDecision`.
+
         Falls back to rule-based routing if LLM output cannot be parsed.
         """
         prompt = _ROUTER_PROMPT_TEMPLATE.format(
@@ -177,39 +223,61 @@ class RouterAgent:
 
         try:
             response = self._llm.invoke(messages)
-            return self._parse_routing_response(response.content, num_docs)
+            return self._parse_routing_response_with_decision(
+                response.content, num_docs, query, has_history
+            )
         except Exception as exc:
             logger.warning(
                 "LLM routing failed, using fallback",
                 extra={"error": str(exc)},
             )
-            return self._fallback_route(query, num_docs, has_history)
+            agent_type = self._fallback_route(query, num_docs, has_history)
+            decision = RoutingDecision(
+                agent=agent_type.value,
+                reasoning=f"Rule-based fallback: LLM routing unavailable ({type(exc).__name__})",
+                confidence=0.7,
+                fallback_used=True,
+                num_docs_available=num_docs,
+            )
+            return agent_type, decision
 
-    def _parse_routing_response(self, raw: str, num_docs: int) -> AgentType:
+    def _classify(
+        self,
+        query: str,
+        num_docs: int,
+        has_history: bool,
+        history_preview: str,
+    ) -> AgentType:
+        """Convenience wrapper — returns only AgentType (backwards compat)."""
+        agent_type, _ = self._classify_with_decision(
+            query, num_docs, has_history, history_preview
+        )
+        return agent_type
+
+    def _parse_routing_response_with_decision(
+        self, raw: str, num_docs: int, query: str = "", has_history: bool = False
+    ) -> tuple[AgentType, RoutingDecision]:
         """
-        Parse the JSON routing response from Gemini.
+        Parse the JSON routing response from the LLM.
+        Returns both the AgentType and a fully populated RoutingDecision.
         Handles markdown code fences and malformed JSON gracefully.
         """
-        # Strip markdown code fences if present
         cleaned = re.sub(r"```(?:json)?\n?", "", raw).strip().rstrip("```").strip()
 
         try:
             obj = json.loads(cleaned)
             agent_str = obj.get("agent", "rag").lower()
             confidence = float(obj.get("confidence", 1.0))
+            reasoning = obj.get("reasoning", "")
 
             logger.debug(
                 "Router classification",
-                extra={
-                    "agent": agent_str,
-                    "reasoning": obj.get("reasoning", ""),
-                    "confidence": confidence,
-                },
+                extra={"agent": agent_str, "reasoning": reasoning, "confidence": confidence},
             )
 
             # Low confidence + no docs → web
             if confidence < 0.6 and num_docs == 0:
-                return AgentType.WEB
+                agent_str = "web"
 
             mapping = {
                 "rag": AgentType.RAG,
@@ -217,14 +285,36 @@ class RouterAgent:
                 "memory": AgentType.MEMORY,
                 "hybrid": AgentType.HYBRID,
             }
-            return mapping.get(agent_str, AgentType.RAG)
+            agent_type = mapping.get(agent_str, AgentType.RAG)
+
+            decision = RoutingDecision(
+                agent=agent_type.value,
+                reasoning=reasoning,
+                confidence=confidence,
+                fallback_used=False,
+                num_docs_available=num_docs,
+            )
+            return agent_type, decision
 
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
             logger.warning(
                 "Could not parse router JSON",
                 extra={"raw": raw[:200], "error": str(exc)},
             )
-            return AgentType.RAG if num_docs > 0 else AgentType.WEB
+            agent_type = AgentType.RAG if num_docs > 0 else AgentType.WEB
+            decision = RoutingDecision(
+                agent=agent_type.value,
+                reasoning="JSON parse error — using heuristic default.",
+                confidence=0.5,
+                fallback_used=True,
+                num_docs_available=num_docs,
+            )
+            return agent_type, decision
+
+    def _parse_routing_response(self, raw: str, num_docs: int) -> AgentType:
+        """Backwards-compatible wrapper — returns only AgentType."""
+        agent_type, _ = self._parse_routing_response_with_decision(raw, num_docs)
+        return agent_type
 
     @staticmethod
     def _fallback_route(query: str, num_docs: int, has_history: bool) -> AgentType:

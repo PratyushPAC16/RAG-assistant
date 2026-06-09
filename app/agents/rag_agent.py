@@ -101,20 +101,30 @@ class RAGAgent:
         logger.info("RAGAgent.run called", extra={"query": query[:80]})
 
         try:
-            # ── Step 1: Hybrid retrieval ───────────────────────────────────────
-            with log_latency(logger, "rag_retrieval") as retrieval_ctx:
-                chunks = self._retriever.retrieve(
-                    query=query, top_k=settings.retrieval_top_k
-                )
+            # ── Step 1: Hybrid retrieval with detailed metrics ─────────────────
+            retrieval_result = self._retriever.retrieve_with_metrics(
+                query=query, top_k=settings.retrieval_top_k
+            )
+            chunks = retrieval_result.chunks
             state.retrieved_chunks = chunks
-            state.latency_ms["retrieval"] = retrieval_ctx.get("latency_ms", 0.0)
+
+            # Emit per-stage latency into state for analytics
+            state.latency_ms["retrieval"] = retrieval_result.total_retrieval_latency_ms
+            state.latency_ms["vector_search"] = retrieval_result.vector_search_latency_ms
+            state.latency_ms["bm25_search"] = retrieval_result.bm25_search_latency_ms
+            state.latency_ms["rrf_fusion"] = retrieval_result.rrf_fusion_latency_ms
+
+            # Store extended retrieval stats for analytics API
+            state.latency_ms["num_vector_results"] = float(retrieval_result.num_vector_results)
+            state.latency_ms["num_bm25_results"] = float(retrieval_result.num_bm25_results)
 
             if not chunks:
                 state.reranked_chunks = []
-                state.agent_type = AgentType.RAG
+                if state.agent_type != AgentType.HYBRID:
+                    state.agent_type = AgentType.RAG
                 return state
 
-            # ── Step 2: Reranking ──────────────────────────────────────────────
+            # ── Step 2: Cross-encoder reranking ────────────────────────────────
             with log_latency(logger, "rag_reranking") as rerank_ctx:
                 reranked = self._reranker.rerank(
                     query=query,
@@ -123,7 +133,8 @@ class RAGAgent:
                 )
             state.reranked_chunks = reranked
             state.latency_ms["reranking"] = rerank_ctx.get("latency_ms", 0.0)
-            state.agent_type = AgentType.RAG
+            if state.agent_type != AgentType.HYBRID:
+                state.agent_type = AgentType.RAG
 
         except Exception as exc:
             error_str = str(exc)

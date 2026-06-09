@@ -88,7 +88,8 @@ class WebSearchAgent:
                 raw_results = self._search(query)
             state.web_results = raw_results
             state.latency_ms["web_search"] = search_ctx.get("latency_ms", 0.0)
-            state.agent_type = AgentType.WEB
+            if state.agent_type != AgentType.HYBRID:
+                state.agent_type = AgentType.WEB
 
         except Exception as exc:
             logger.error(
