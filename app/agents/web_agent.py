@@ -176,7 +176,7 @@ class WebSearchAgent:
     def _build_citations(results: list[dict[str, Any]]) -> list[SourceCitation]:
         """
         Build SourceCitation objects from web results.
-        Uses URL as the document identifier.
+        Uses URL as the chunk_id/identifier.
         """
         citations: list[SourceCitation] = []
         for result in results:
@@ -186,8 +186,9 @@ class WebSearchAgent:
                     SourceCitation(
                         document=result.get("title", url),
                         page=None,  # Web results don't have pages
-                        chunk_id=None,
+                        chunk_id=url,
                         relevance_score=result.get("score"),
+                        text=result.get("content"),
                     )
                 )
         return citations

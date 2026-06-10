@@ -173,6 +173,7 @@ def memory_retriever_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     LangGraph node: retrieve relevant memories from long-term memory store.
     """
+    t0 = time.perf_counter()
     from datetime import datetime
     agent_state = _dict_to_state(state)
     agent_state.routing_trace.append("🧠 Long-Term Memory: searching for relevant user preferences and facts…")
@@ -209,6 +210,9 @@ def memory_retriever_node(state: dict[str, Any]) -> dict[str, Any]:
     else:
         trace_entry = "🧠 Long-Term Memory: no relevant memories found"
         
+    elapsed = (time.perf_counter() - t0) * 1000
+    agent_state.latency_ms["memory"] = round(elapsed, 2)
+    
     serialized = _state_to_dict(agent_state)
     serialized["routing_trace"] = [trace_entry]
     serialized["retrieved_memories"] = [m.model_dump(mode="json") for m in retrieved_memories]
@@ -274,10 +278,13 @@ def memory_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     LangGraph node: answer using conversation memory.
     """
+    t0 = time.perf_counter()
     agent_state = _dict_to_state(state)
     agent_state.routing_trace.append("🧠 Memory Agent: retrieving conversation history…")
     memory = get_memory_agent()
     updated = memory.run(agent_state)
+    elapsed = (time.perf_counter() - t0) * 1000
+    updated.latency_ms["memory_agent"] = round(elapsed, 2)
     serialized = _state_to_dict(updated)
     trace_entry = "🧠 Memory Agent: context loaded from session history"
     return {

@@ -199,6 +199,7 @@ class ResponseSynthesizer:
                             page=matched_chunk.metadata.page,
                             chunk_id=matched_chunk.chunk_id,
                             relevance_score=matched_chunk.rerank_score or 1.0,
+                            text=matched_chunk.text,
                         )
                     )
                 else:
@@ -219,9 +220,11 @@ class ResponseSynthesizer:
                 seen.add(url)
                 # Find corresponding website title
                 title = "Web Link"
+                web_text = None
                 for res in web_results:
                     if res.get("url") == url:
                         title = res.get("title", title)
+                        web_text = res.get("content")
                         break
                 citations.append(
                     SourceCitation(
@@ -229,6 +232,7 @@ class ResponseSynthesizer:
                         page=None,
                         chunk_id=url,
                         relevance_score=1.0,
+                        text=web_text,
                     )
                 )
 

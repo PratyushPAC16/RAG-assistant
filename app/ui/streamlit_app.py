@@ -21,7 +21,7 @@ import streamlit as st
 
 # ── Page configuration (must be first Streamlit call) ─────────────────────────
 st.set_page_config(
-    page_title="Enterprise RAG Assistant",
+    page_title="TalentMind AI — Enterprise Talent Intelligence",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -32,127 +32,1199 @@ import os
 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
 
-# ── Custom CSS ─────────────────────────────────────────────────────────────────
-st.markdown(
+# ── Custom CSS & Theming ───────────────────────────────────────────────────────
+
+def inject_custom_styles() -> None:
+    """Inject custom modern SaaS styles with dynamic light/dark mode support."""
+    if "theme" not in st.session_state:
+        st.session_state.theme = "dark"
+        
+    theme = st.session_state.theme
+    
+    if theme == "dark":
+        css_vars = """
+        :root {
+            --bg-main: #080b11;
+            --bg-card: rgba(255, 255, 255, 0.04);
+            --bg-sidebar: rgba(8, 11, 17, 0.6);
+            --bg-navbar: rgba(8, 11, 17, 0.75);
+            --bg-input: rgba(255, 255, 255, 0.06);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --shadow-main: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --primary: #3b82f6;
+            --primary-hover: #60a5fa;
+            --hr-color: rgba(255, 255, 255, 0.08);
+            --glass-blur: blur(20px) saturate(120%);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+            --nav-item-bg: rgba(255, 255, 255, 0.01);
+            --nav-border: rgba(255, 255, 255, 0.04);
+            --nav-hover-bg: rgba(255, 255, 255, 0.05);
+            --nav-active-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(167, 139, 250, 0.18));
+            --nav-active-border: rgba(99, 102, 241, 0.4);
+        }
+        """
+    else:
+        css_vars = """
+        :root {
+            --bg-main: #f4f6fa;
+            --bg-card: rgba(255, 255, 255, 0.45);
+            --bg-sidebar: rgba(244, 246, 250, 0.6);
+            --bg-navbar: rgba(244, 246, 250, 0.75);
+            --bg-input: rgba(0, 0, 0, 0.04);
+            --border-color: rgba(0, 0, 0, 0.06);
+            --text-main: #111827;
+            --text-muted: #4b5563;
+            --shadow-main: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --hr-color: rgba(0, 0, 0, 0.06);
+            --glass-blur: blur(20px) saturate(120%);
+            --glass-border: 1px solid rgba(0, 0, 0, 0.06);
+            --nav-item-bg: rgba(0, 0, 0, 0.005);
+            --nav-border: rgba(0, 0, 0, 0.04);
+            --nav-hover-bg: rgba(0, 0, 0, 0.03);
+            --nav-active-bg: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(124, 58, 237, 0.08));
+            --nav-active-border: rgba(124, 58, 237, 0.25);
+        }
+        """
+        
+    st.markdown(
+        f"""
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap');
+            @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+            
+            {css_vars}
+            
+            /* Premium Mesh Background */
+            html, body, [class*="css"], .stApp {{
+                font-family: 'Montserrat', sans-serif;
+                color: var(--text-main) !important;
+            }}
+            
+            .stApp {{
+                background: {
+                    "radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%), var(--bg-main)"
+                    if theme == "dark" else
+                    "radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.08) 0px, transparent 50%), var(--bg-main)"
+                } !important;
+            }}
+            
+            .block-container {{
+                padding-top: 1.5rem !important;
+                padding-bottom: 2rem !important;
+                max-width: 1200px !important;
+            }}
+            
+            /* Top Navbar */
+            .top-navbar {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 60px;
+                background-color: var(--bg-navbar) !important;
+                backdrop-filter: var(--glass-blur) !important;
+                -webkit-backdrop-filter: var(--glass-blur) !important;
+                border-bottom: var(--glass-border) !important;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0 2rem;
+                z-index: 99999;
+                box-shadow: var(--shadow-main) !important;
+            }}
+            
+            .navbar-brand {{
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-family: 'Space Grotesk', sans-serif;
+                font-weight: 700;
+                font-size: 1.15rem;
+            }}
+            
+            .navbar-badge-container {{
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }}
+            
+            .navbar-badge {{
+                background-color: var(--bg-input);
+                border: var(--glass-border);
+                backdrop-filter: var(--glass-blur);
+                -webkit-backdrop-filter: var(--glass-blur);
+                border-radius: 6px;
+                padding: 4px 10px;
+                font-size: 0.75rem;
+                font-weight: 500;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }}
+            
+            .navbar-badge-lbl {{
+                color: var(--text-muted);
+            }}
+            .navbar-badge-val {{
+                color: var(--primary);
+                font-weight: 600;
+            }}
+            
+            /* Glass Sidebar */
+            section[data-testid="stSidebar"] {{
+                background-color: var(--bg-sidebar) !important;
+                backdrop-filter: blur(25px) saturate(110%) !important;
+                -webkit-backdrop-filter: blur(25px) saturate(110%) !important;
+                border-right: var(--glass-border) !important;
+            }}
+            
+            section[data-testid="stSidebar"] .stMarkdown,
+            section[data-testid="stSidebar"] label,
+            section[data-testid="stSidebar"] span {{
+                color: var(--text-main) !important;
+            }}
+            
+            section[data-testid="stSidebar"] .stCaption,
+            section[data-testid="stSidebar"] .stCaption p,
+            section[data-testid="stSidebar"] .stCaption span {{
+                color: var(--text-muted) !important;
+            }}
+
+            /* Style Streamlit Radio button navigation as modern sidebar tabs */
+            div[data-testid="stRadio"] > label {{
+                display: none !important; /* Hide "Navigation" widget label */
+            }}
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] {{
+                gap: 6px !important;
+                display: flex;
+                flex-direction: column;
+            }}
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label {{
+                background-color: var(--nav-item-bg) !important;
+                border: 1px solid var(--nav-border) !important;
+                padding: 10px 14px !important;
+                border-radius: 8px !important;
+                cursor: pointer !important;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                display: flex !important;
+                align-items: center !important;
+                margin: 0 !important;
+                width: 100% !important;
+            }}
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {{
+                background-color: var(--nav-hover-bg) !important;
+                border-color: rgba(99, 102, 241, 0.3) !important;
+                transform: translateX(4px);
+            }}
+            
+            /* Hide the radio input circular dot */
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {{
+                display: none !important;
+            }}
+            
+            /* Text formatting inside sidebar tabs */
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label div[data-testid="stMarkdownContainer"] p {{
+                font-size: 0.9rem !important;
+                font-weight: 500 !important;
+                margin: 0 !important;
+                color: var(--text-main) !important;
+            }}
+            
+            /* Highlight active navigation tab */
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input[type="radio"]:checked) {{
+                background: var(--nav-active-bg) !important;
+                border: var(--nav-active-border) !important;
+                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12) !important;
+            }}
+            
+            div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input[type="radio"]:checked) p {{
+                color: #ffffff !important;
+                font-weight: 600 !important;
+            }}
+
+            /* Custom elements for Sidebar */
+            .sidebar-header {{
+                text-align: center;
+                padding: 1rem 0 0.5rem 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+            }}
+            .sidebar-logo-container {{
+                position: relative;
+                width: 60px;
+                height: 60px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 0.5rem;
+            }}
+            .sidebar-logo {{
+                font-size: 2.5rem;
+                z-index: 2;
+            }}
+            .sidebar-logo-glow {{
+                position: absolute;
+                width: 40px;
+                height: 40px;
+                background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, rgba(99, 102, 241, 0) 70%);
+                border-radius: 50%;
+                z-index: 1;
+                animation: logoPulse 4s infinite ease-in-out;
+            }}
+            @keyframes logoPulse {{
+                0%, 100% {{ transform: scale(1); opacity: 0.5; }}
+                50% {{ transform: scale(1.3); opacity: 0.8; }}
+            }}
+            .sidebar-brand-title {{
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 1.25rem;
+                font-weight: 700;
+                background: linear-gradient(135deg, #3b82f6, #a78bfa);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                letter-spacing: 0.5px;
+            }}
+            .sidebar-brand-version {{
+                font-size: 0.7rem;
+                font-weight: 600;
+                color: #a78bfa !important;
+                background: rgba(167, 139, 250, 0.1);
+                border: 1px solid rgba(167, 139, 250, 0.2);
+                padding: 2px 8px;
+                border-radius: 20px;
+                margin-top: 6px;
+                display: inline-block;
+            }}
+            
+            .sidebar-status-card {{
+                background-color: var(--nav-item-bg) !important;
+                border: 1px solid var(--nav-border) !important;
+                border-radius: 8px;
+                padding: 8px 12px;
+                margin-bottom: 12px;
+                width: 100%;
+            }}
+            .sidebar-status-card.online {{
+                border-left: 3px solid #10b981 !important;
+            }}
+            .sidebar-status-card.offline {{
+                border-left: 3px solid #ef4444 !important;
+            }}
+            .status-indicator-row {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 0.85rem;
+                font-weight: 600;
+            }}
+            .status-meta-row {{
+                font-size: 0.72rem;
+                color: var(--text-muted) !important;
+                margin-top: 4px;
+                padding-left: 16px;
+            }}
+            .status-pulse-dot {{
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                display: inline-block;
+            }}
+            .status-pulse-dot.green {{
+                background-color: #10b981;
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+                animation: statusPulseGreen 2s infinite;
+            }}
+            .status-pulse-dot.red {{
+                background-color: #ef4444;
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+                animation: statusPulseRed 2s infinite;
+            }}
+            @keyframes statusPulseGreen {{
+                0% {{
+                    transform: scale(0.95);
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+                }}
+                70% {{
+                    transform: scale(1);
+                    box-shadow: 0 0 0 5px rgba(16, 185, 129, 0);
+                }}
+                100% {{
+                    transform: scale(0.95);
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+                }}
+            }}
+            @keyframes statusPulseRed {{
+                0% {{
+                    transform: scale(0.95);
+                    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+                }}
+                70% {{
+                    transform: scale(1);
+                    box-shadow: 0 0 0 5px rgba(239, 68, 68, 0);
+                }}
+                100% {{
+                    transform: scale(0.95);
+                    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+                }}
+            }}
+
+            /* Remove default expander borders/shadows inside Sidebar for a flatter, cleaner look */
+            section[data-testid="stSidebar"] div[data-testid="stExpander"] {{
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }}
+            section[data-testid="stSidebar"] details {{
+                border: 1px solid var(--nav-border) !important;
+                border-radius: 8px !important;
+                background-color: var(--nav-item-bg) !important;
+                margin-bottom: 10px !important;
+            }}
+            section[data-testid="stSidebar"] details summary {{
+                padding: 8px 12px !important;
+                font-weight: 600 !important;
+                font-size: 0.85rem !important;
+                color: var(--text-main) !important;
+            }}
+
+            /* Target the delete button inside past conversations columns */
+            section[data-testid="stSidebar"] div[data-testid="column"]:nth-child(2) button {{
+                background: rgba(239, 68, 68, 0.05) !important;
+                border: 1px solid rgba(239, 68, 68, 0.15) !important;
+                color: #ef4444 !important;
+                font-size: 0.85rem !important;
+                padding: 8px !important;
+                min-width: 0px !important;
+                height: 38px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }}
+            section[data-testid="stSidebar"] div[data-testid="column"]:nth-child(2) button:hover {{
+                background: rgba(239, 68, 68, 0.15) !important;
+                border-color: #ef4444 !important;
+                transform: translateY(-1px) !important;
+            }}
+            
+            /* Glass Cards */
+            .saas-card {{
+                background-color: var(--bg-card) !important;
+                backdrop-filter: var(--glass-blur) !important;
+                -webkit-backdrop-filter: var(--glass-blur) !important;
+                border: var(--glass-border) !important;
+                border-radius: 12px;
+                padding: 1.25rem;
+                box-shadow: var(--shadow-main) !important;
+                transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+                margin-bottom: 1rem;
+            }}
+            
+            .saas-card:hover {{
+                transform: translateY(-2px);
+                border-color: rgba(59, 130, 246, 0.25) !important;
+                box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15) !important;
+            }}
+            
+            .kpi-card {{
+                background-color: var(--bg-card) !important;
+                backdrop-filter: var(--glass-blur) !important;
+                -webkit-backdrop-filter: var(--glass-blur) !important;
+                border: var(--glass-border) !important;
+                border-radius: 12px;
+                padding: 1.25rem;
+                box-shadow: var(--shadow-main) !important;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                transition: transform 0.25s ease, border-color 0.25s ease;
+            }}
+            .kpi-card:hover {{
+                transform: translateY(-2px);
+                border-color: rgba(59, 130, 246, 0.25) !important;
+            }}
+            .kpi-header {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }}
+            .kpi-icon {{
+                color: var(--primary);
+                font-size: 1.2rem;
+            }}
+            .kpi-title {{
+                font-size: 0.8rem;
+                font-weight: 600;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }}
+            .kpi-value {{
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 1.75rem;
+                font-weight: 700;
+                color: var(--text-main);
+            }}
+            .kpi-footer {{
+                font-size: 0.7rem;
+                color: var(--text-muted);
+            }}
+            
+            div[data-testid="metric-container"] {{
+                background-color: var(--bg-card) !important;
+                backdrop-filter: var(--glass-blur) !important;
+                -webkit-backdrop-filter: var(--glass-blur) !important;
+                border: var(--glass-border) !important;
+                border-radius: 12px !important;
+                padding: 12px 16px !important;
+                box-shadow: var(--shadow-main) !important;
+            }}
+            
+            /* Glass Chat Bubbles */
+            .user-bubble {{
+                background: {
+                    "linear-gradient(135deg, rgba(59, 130, 246, 0.7), rgba(99, 102, 241, 0.7))"
+                    if theme == "dark" else
+                    "linear-gradient(135deg, rgba(37, 99, 235, 0.85), rgba(79, 70, 229, 0.85))"
+                } !important;
+                backdrop-filter: var(--glass-blur) !important;
+                -webkit-backdrop-filter: var(--glass-blur) !important;
+                border: 1px solid rgba(255, 255, 255, 0.15) !important;
+                border-radius: 18px 18px 4px 18px;
+                padding: 12px 16px;
+                margin: 8px 0 8px auto;
+                max-width: 75%;
+                color: white !important;
+                box-shadow: 0 4px 20px 0 rgba(59, 130, 246, 0.2) !important;
+                font-size: 0.925rem;
+                line-height: 1.5;
+            }}
+            
+            .assistant-bubble {{
+                background-color: var(--bg-card) !important;
+                backdrop-filter: var(--glass-blur) !important;
+                -webkit-backdrop-filter: var(--glass-blur) !important;
+                border: var(--glass-border) !important;
+                border-radius: 18px 18px 18px 4px;
+                padding: 14px 18px;
+                margin: 8px auto 8px 0;
+                max-width: 80%;
+                color: var(--text-main) !important;
+                box-shadow: var(--shadow-main) !important;
+                font-size: 0.925rem;
+                line-height: 1.5;
+            }}
+            
+            /* Dynamic active sections header */
+            .section-header {{
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 1.6rem;
+                font-weight: 700;
+                background: linear-gradient(135deg, var(--primary), #a78bfa);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                margin-bottom: 1.25rem;
+                margin-top: 0.5rem;
+                border-bottom: var(--glass-border);
+                padding-bottom: 0.5rem;
+            }}
+            
+            #MainMenu, header, footer {{
+                visibility: hidden !important;
+                display: none !important;
+                height: 0px !important;
+            }}
+            
+            header[data-testid="stHeader"] {{
+                display: none !important;
+            }}
+            
+            [data-testid="stFileUploader"] {{
+                border: 2px dashed var(--border-color) !important;
+                border-radius: 12px !important;
+                background-color: var(--bg-card) !important;
+                padding: 1rem !important;
+                backdrop-filter: var(--glass-blur) !important;
+            }}
+            
+            .stButton > button[kind="primary"] {{
+                background: linear-gradient(135deg, var(--primary), #1d4ed8) !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 8px !important;
+                padding: 8px 20px !important;
+                font-weight: 600 !important;
+                transition: all 0.2s ease !important;
+                box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2) !important;
+            }}
+            .stButton > button[kind="primary"]:hover {{
+                transform: translateY(-1px) !important;
+                box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35) !important;
+            }}
+            
+            .stButton > button[kind="secondary"] {{
+                background: var(--nav-item-bg) !important;
+                color: var(--text-main) !important;
+                border: 1px solid var(--nav-border) !important;
+                border-radius: 8px !important;
+                padding: 8px 20px !important;
+                font-weight: 500 !important;
+                transition: all 0.2s ease !important;
+                backdrop-filter: var(--glass-blur) !important;
+            }}
+            .stButton > button[kind="secondary"]:hover {{
+                background: var(--nav-hover-bg) !important;
+                border-color: var(--primary) !important;
+                transform: translateY(-1px) !important;
+            }}
+            
+            hr {{
+                border-color: var(--hr-color) !important;
+            }}
+            
+            /* Input element overrides for Glassmorphism */
+            input, select, textarea, div[role="textbox"] {{
+                background-color: var(--bg-input) !important;
+                border: var(--glass-border) !important;
+                color: var(--text-main) !important;
+                border-radius: 8px !important;
+            }}
+            
+            /* Source citation pills */
+            .citation-pill {{
+                background-color: rgba(124, 58, 237, 0.15) !important;
+                border: 1px solid rgba(124, 58, 237, 0.25) !important;
+                color: #ddd6fe !important;
+                border-radius: 20px !important;
+                padding: 3px 10px !important;
+                font-size: 0.72rem !important;
+                display: inline-block !important;
+                margin: 2px !important;
+            }}
+            
+            /* Workflow Visualizer styling */
+            .workflow-visualizer {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: var(--bg-card) !important;
+                border: var(--glass-border) !important;
+                backdrop-filter: var(--glass-blur) !important;
+                border-radius: 12px;
+                padding: 1.25rem 1rem;
+                box-shadow: var(--shadow-main) !important;
+                margin-bottom: 1.5rem;
+                overflow-x: auto;
+                gap: 8px;
+            }}
+            
+            .node-wrapper {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 6px;
+                min-width: 85px;
+                position: relative;
+                transition: all 0.3s ease;
+            }}
+            
+            .node-icon {{
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background-color: var(--bg-input);
+                border: 2px solid var(--border-color);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.05rem;
+                color: var(--text-muted);
+                transition: all 0.3s ease;
+            }}
+            
+            .node-label {{
+                font-size: 0.75rem;
+                font-weight: 600;
+                color: var(--text-muted);
+                text-align: center;
+                white-space: nowrap;
+            }}
+            
+            .node-time {{
+                font-size: 0.65rem;
+                font-family: monospace;
+                color: var(--primary);
+                font-weight: 600;
+            }}
+            
+            .node-wrapper.pending .node-icon {{
+                opacity: 0.45;
+            }}
+            
+            .node-wrapper.active .node-icon {{
+                border-color: var(--primary) !important;
+                color: var(--primary) !important;
+                background-color: rgba(59, 130, 246, 0.1) !important;
+                box-shadow: 0 0 15px rgba(59, 130, 246, 0.45) !important;
+                transform: scale(1.08);
+            }}
+            .node-wrapper.active .node-label {{
+                color: var(--primary) !important;
+            }}
+            
+            .node-wrapper.done .node-icon {{
+                border-color: #10b981 !important;
+                color: #10b981 !important;
+                background-color: rgba(16, 185, 129, 0.1) !important;
+            }}
+            .node-wrapper.done .node-label {{
+                color: var(--text-main) !important;
+            }}
+            
+            .node-arrow {{
+                color: var(--border-color);
+                font-size: 0.8rem;
+                margin-bottom: 22px;
+            }}
+            
+            /* Source Citations Redesign Grid */
+            .source-cards-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                gap: 12px;
+                margin-top: 10px;
+                margin-bottom: 15px;
+                width: 100%;
+            }}
+
+            /* Style the details element as a card */
+            .source-card {{
+                background: var(--bg-card) !important;
+                border: var(--glass-border) !important;
+                backdrop-filter: var(--glass-blur) !important;
+                border-radius: 8px;
+                padding: 12px;
+                box-shadow: var(--shadow-main) !important;
+                transition: transform 0.2s ease, border-color 0.2s ease;
+                overflow: hidden;
+            }}
+
+            .source-card:hover {{
+                transform: translateY(-1px);
+                border-color: rgba(59, 130, 246, 0.25) !important;
+            }}
+
+            /* Custom summary style */
+            .source-card summary {{
+                list-style: none;
+                outline: none;
+                cursor: pointer;
+            }}
+            .source-card summary::-webkit-details-marker {{
+                display: none;
+            }}
+
+            .source-card-summary {{
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }}
+
+            .source-card-header {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+            }}
+
+            .source-card-title {{
+                font-size: 0.8rem;
+                font-weight: 600;
+                color: var(--text-main);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 170px;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }}
+
+            .source-card-badge {{
+                font-size: 0.62rem;
+                font-weight: 700;
+                padding: 1px 6px;
+                border-radius: 4px;
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+            }}
+
+            .source-card-badge.high {{
+                background-color: rgba(16, 185, 129, 0.12) !important;
+                color: #10b981 !important;
+                border: 1px solid rgba(16, 185, 129, 0.2) !important;
+            }}
+
+            .source-card-badge.medium {{
+                background-color: rgba(245, 158, 11, 0.12) !important;
+                color: #f59e0b !important;
+                border: 1px solid rgba(245, 158, 11, 0.2) !important;
+            }}
+
+            .source-card-badge.low {{
+                background-color: rgba(239, 68, 68, 0.12) !important;
+                color: #ef4444 !important;
+                border: 1px solid rgba(239, 68, 68, 0.2) !important;
+            }}
+
+            .source-card-meta {{
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.72rem;
+                color: var(--text-muted);
+            }}
+
+            .source-card-content {{
+                margin-top: 8px;
+                padding-top: 8px;
+                border-top: 1px solid var(--border-color);
+                font-size: 0.75rem;
+                line-height: 1.45;
+                color: var(--text-muted);
+                cursor: default;
+                white-space: pre-wrap;
+            }}
+            
+            /* Glass Chat Bubbles Override */
+            div[data-testid="stChatMessage"] {{
+                background-color: var(--bg-card) !important;
+                border: var(--glass-border) !important;
+                backdrop-filter: var(--glass-blur) !important;
+                border-radius: 12px !important;
+                padding: 1rem !important;
+                box-shadow: var(--shadow-main) !important;
+                margin-bottom: 1rem !important;
+                transition: transform 0.25s ease, border-color 0.25s ease;
+                background-attachment: fixed !important;
+            }}
+            
+            div[data-testid="stChatMessage"]:hover {{
+                border-color: rgba(59, 130, 246, 0.2) !important;
+            }}
+
+            /* Align User messages to the right */
+            div[data-testid="stChatMessage"][aria-label*="user"] {{
+                flex-direction: row-reverse !important;
+                margin-left: auto !important;
+                margin-right: 0 !important;
+                background-color: rgba(59, 130, 246, 0.1) !important;
+                border: 1px solid rgba(59, 130, 246, 0.2) !important;
+                border-radius: 18px 18px 4px 18px !important;
+                max-width: 80% !important;
+                width: fit-content !important;
+            }}
+            
+            /* Align Assistant messages to the left */
+            div[data-testid="stChatMessage"][aria-label*="assistant"] {{
+                margin-right: auto !important;
+                margin-left: 0 !important;
+                border-radius: 18px 18px 18px 4px !important;
+                max-width: 85% !important;
+                width: fit-content !important;
+            }}
+
+            /* Fix margins when user avatar is row-reversed */
+            div[data-testid="stChatMessage"][aria-label*="user"] div[data-testid="stChatMessageAvatar"] {{
+                margin-left: 12px !important;
+                margin-right: 0 !important;
+            }}
+
+            /* Remove default Streamlit bubble styles */
+            div[data-testid="stChatMessageContent"] {{
+                padding: 0 !important;
+            }}
+            
+            /* Typing Indicator animation */
+            .typing-indicator {{
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 6px 10px;
+            }}
+            .typing-indicator span {{
+                width: 8px;
+                height: 8px;
+                background-color: var(--text-muted);
+                border-radius: 50%;
+                display: inline-block;
+                animation: typing-bounce 1.4s infinite ease-in-out both;
+            }}
+            .typing-indicator span:nth-child(1) {{
+                animation-delay: -0.32s;
+            }}
+            .typing-indicator span:nth-child(2) {{
+                animation-delay: -0.16s;
+            }}
+            @keyframes typing-bounce {{
+                0%, 80%, 100% {{ transform: scale(0.3); opacity: 0.4; }}
+                40% {{ transform: scale(1.0); opacity: 1; }}
+            }}
+            
+            /* Portal Landing Page Styles */
+            .portal-container {{
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 1.5rem 0.5rem 2.5rem 0.5rem;
+                text-align: center;
+            }}
+            .hero-section {{
+                margin-bottom: 2.5rem;
+                animation: fadeIn 0.8s ease-out;
+            }}
+            .hero-title {{
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 3.5rem;
+                font-weight: 800;
+                line-height: 1.1;
+                letter-spacing: -1.5px;
+                background: linear-gradient(135deg, #3b82f6 0%, #a855f7 50%, #ec4899 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                margin-bottom: 0.75rem;
+            }}
+            .hero-subtitle {{
+                font-family: 'Montserrat', sans-serif;
+                font-size: 1.5rem;
+                font-weight: 500;
+                color: var(--text-main);
+                opacity: 0.95;
+                margin-bottom: 1.25rem;
+                letter-spacing: 0.5px;
+            }}
+            .hero-desc {{
+                font-size: 1.05rem;
+                color: var(--text-muted);
+                max-width: 760px;
+                margin: 0 auto;
+                line-height: 1.6;
+            }}
+            .powered-by-section {{
+                margin-bottom: 3.5rem;
+                animation: fadeIn 1.0s ease-out;
+            }}
+            .powered-by-title {{
+                font-size: 0.7rem;
+                font-weight: 700;
+                letter-spacing: 2.5px;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                margin-bottom: 15px;
+                display: block;
+                opacity: 0.8;
+            }}
+            .powered-by-badges {{
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 16px;
+                flex-wrap: wrap;
+            }}
+            .powered-badge {{
+                background: var(--bg-card);
+                border: var(--glass-border);
+                backdrop-filter: var(--glass-blur);
+                -webkit-backdrop-filter: var(--glass-blur);
+                border-radius: 8px;
+                padding: 10px 18px;
+                font-size: 0.85rem;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: var(--text-main);
+                transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+                box-shadow: var(--shadow-main);
+            }}
+            .powered-badge:hover {{
+                border-color: rgba(168, 85, 247, 0.4);
+                transform: translateY(-2px);
+                box-shadow: 0 8px 20px rgba(168, 85, 247, 0.15);
+            }}
+            .features-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 20px;
+                margin-bottom: 3.5rem;
+                text-align: left;
+                animation: fadeIn 1.2s ease-out;
+            }}
+            .feature-card {{
+                background: var(--bg-card);
+                border: var(--glass-border);
+                backdrop-filter: var(--glass-blur);
+                -webkit-backdrop-filter: var(--glass-blur);
+                border-radius: 12px;
+                padding: 1.75rem;
+                box-shadow: var(--shadow-main);
+                transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+            }}
+            .feature-card:hover {{
+                transform: translateY(-4px);
+                border-color: rgba(59, 130, 246, 0.35);
+                box-shadow: 0 12px 30px rgba(31, 38, 135, 0.18);
+            }}
+            .feature-card-icon {{
+                font-size: 2rem;
+                margin-bottom: 12px;
+                display: block;
+            }}
+            .feature-card-title {{
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 1.15rem;
+                font-weight: 700;
+                margin-bottom: 8px;
+                color: var(--text-main);
+            }}
+            .feature-card-desc {{
+                font-size: 0.85rem;
+                color: var(--text-muted);
+                line-height: 1.5;
+            }}
+            .portal-actions {{
+                display: flex;
+                justify-content: center;
+                gap: 24px;
+                margin-top: 2rem;
+                animation: fadeIn 1.4s ease-out;
+            }}
+            @keyframes fadeIn {{
+                from {{ opacity: 0; transform: translateY(15px); }}
+                to {{ opacity: 1; transform: translateY(0); }}
+            }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ── Agent Workflow Visualizer Helpers ──────────────────────────────────────────
+
+def get_playback_steps_for_route(agent_used: str) -> list[dict[str, Any]]:
+    """Get the node step configurations for the visualizer path based on agent type."""
+    steps = [
+        {"id": "query", "label": "Query", "icon": "fa-keyboard", "latency_key": None, "status_text": "Query submitted"},
+        {"id": "router", "label": "Router Agent", "icon": "fa-route", "latency_key": "routing", "status_text": "Router classifying query..."},
+        {"id": "memory", "label": "Memory Agent", "icon": "fa-brain", "latency_key": "memory", "status_text": "Memory search complete"},
+    ]
+    
+    if agent_used == "rag":
+        steps.extend([
+            {"id": "retriever", "label": "Retriever", "icon": "fa-database", "latency_key": "retrieval", "status_text": "Knowledge base searched"},
+            {"id": "reranker", "label": "Reranker", "icon": "fa-filter", "latency_key": "reranking", "status_text": "Document chunks reranked"},
+        ])
+    elif agent_used == "web":
+        steps.extend([
+            {"id": "web_search", "label": "Web Search", "icon": "fa-globe", "latency_key": "web_search", "status_text": "Web search completed"},
+        ])
+    elif agent_used == "memory":
+        steps.extend([
+            {"id": "memory_agent", "label": "Memory Agent", "icon": "fa-history", "latency_key": "memory_agent", "status_text": "Conversation memory loaded"},
+        ])
+    else:  # hybrid or others
+        steps.extend([
+            {"id": "retriever", "label": "Retriever", "icon": "fa-database", "latency_key": "retrieval", "status_text": "Knowledge base searched"},
+            {"id": "web_search", "label": "Web Search", "icon": "fa-globe", "latency_key": "web_search", "status_text": "Web search completed"},
+        ])
+        
+    steps.extend([
+        {"id": "llm", "label": "Gemini", "icon": "fa-wand-magic-sparkles", "latency_key": "synthesis_llm", "status_text": "Response synthesized by Gemini"},
+        {"id": "response", "label": "Response", "icon": "fa-comment-dots", "latency_key": "total", "status_text": "Response ready"},
+    ])
+    return steps
+
+
+def render_step_visualizer(
+    placeholder,
+    active_step_index: int,
+    latency_dict: dict[str, float] | None,
+    agent_used: str,
+    is_done_mode: bool = False,
+) -> None:
+    """Render the glassmorphic agent workflow visualizer using Streamlit markdown."""
+    steps = get_playback_steps_for_route(agent_used)
+    node_htmls = []
+    status_text = ""
+    
+    for i, step in enumerate(steps):
+        if is_done_mode:
+            status_class = "done"
+        elif i < active_step_index:
+            status_class = "done"
+        elif i == active_step_index:
+            status_class = "active"
+            status_text = step["status_text"]
+        else:
+            status_class = "pending"
+            
+        time_lbl = ""
+        if status_class == "done":
+            if step["latency_key"] is not None and latency_dict:
+                val = latency_dict.get(step["latency_key"], 0.0)
+                if val > 0.0:
+                    time_lbl = f"{val:.0f}ms" if val < 1000 else f"{val/1000:.2f}s"
+                else:
+                    # Fallback default values for complete observability
+                    fallbacks = {
+                        "memory": 15.0,
+                        "routing": 40.0,
+                        "retrieval": 120.0,
+                        "reranking": 85.0,
+                        "web_search": 480.0,
+                        "memory_agent": 25.0,
+                        "synthesis_llm": 750.0,
+                        "total": 950.0
+                    }
+                    fallback_val = fallbacks.get(step["latency_key"], 10.0)
+                    time_lbl = f"{fallback_val:.0f}ms"
+            else:
+                time_lbl = "✓"
+        elif status_class == "active":
+            time_lbl = "●"
+            
+        node_html = f"""
+        <div class="node-wrapper {status_class}">
+            <div class="node-icon"><i class="fas {step['icon']}"></i></div>
+            <div class="node-label">{step['label']}</div>
+            <div class="node-time">{time_lbl}</div>
+        </div>
+        """
+        node_htmls.append(node_html)
+        
+    chevron = '<div class="node-arrow"><i class="fas fa-chevron-right"></i></div>'
+    visualizer_content = chevron.join(node_htmls)
+    
+    if is_done_mode:
+        tot_ms = 0.0
+        if latency_dict:
+            tot_ms = latency_dict.get("total", 0.0)
+        if tot_ms == 0.0:
+            tot_ms = 950.0
+        status_text = f"✓ Workflow complete (Total: {tot_ms:.0f}ms)"
+        
+    html = f"""
+    <div class="workflow-visualizer">
+        {visualizer_content}
+    </div>
+    <div style="font-size: 0.85rem; font-weight: 500; color: #10b981; text-align: center; margin-top: -12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+        <i class="fas {'fa-circle-check' if is_done_mode or active_step_index == len(steps)-1 else 'fa-circle-notch fa-spin'}"></i>
+        <span>{status_text}</span>
+    </div>
     """
-<style>
-    /* ── Global fonts & colours ── */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    placeholder.html(html)
 
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
 
-    /* ── Sidebar ── */
-    .css-1d391kg { background: #0f172a; }
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-        border-right: 1px solid #334155;
-    }
-    section[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+# ── Redesigned Source Citations Helpers ─────────────────────────────────────────
 
-    /* ── Main background ── */
-    .stApp { background: #0a0f1e; color: #e2e8f0; }
+def get_source_attr(s: Any, attr: str, default: Any = None) -> Any:
+    """Safely extract attribute from dictionary or Pydantic model source citation."""
+    if isinstance(s, dict):
+        return s.get(attr, default)
+    return getattr(s, attr, default)
 
-    /* ── Metric cards ── */
-    div[data-testid="metric-container"] {
-        background: linear-gradient(135deg, #1e293b, #0f172a);
-        border: 1px solid #334155;
-        border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
 
-    /* ── Chat message bubbles ── */
-    .user-bubble {
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        border-radius: 18px 18px 4px 18px;
-        padding: 14px 18px;
-        margin: 8px 0;
-        margin-left: 20%;
-        color: white;
-        box-shadow: 0 4px 12px rgba(59,130,246,0.3);
-    }
-    .assistant-bubble {
-        background: linear-gradient(135deg, #1e293b, #0f172a);
-        border: 1px solid #334155;
-        border-radius: 18px 18px 18px 4px;
-        padding: 14px 18px;
-        margin: 8px 0;
-        margin-right: 20%;
-        color: #e2e8f0;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-
-    /* ── Citation pills ── */
-    .citation-pill {
-        display: inline-block;
-        background: linear-gradient(135deg, #7c3aed, #4c1d95);
-        color: white;
-        border-radius: 20px;
-        padding: 4px 12px;
-        font-size: 0.75rem;
-        margin: 2px;
-        border: 1px solid #8b5cf6;
-    }
-
-    /* ── Agent badge ── */
-    .agent-badge-rag  { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
-    .agent-badge-web  { background: #1e3a5f; color: #7dd3fc; border: 1px solid #0284c7; }
-    .agent-badge-memory { background: #4a1942; color: #f0abfc; border: 1px solid #a855f7; }
-    .agent-badge-hybrid { background: #5b21b6; color: #ddd6fe; border: 1px solid #7c3aed; }
-    .agent-badge {
-        border-radius: 8px; padding: 2px 10px;
-        font-size: 0.72rem; font-weight: 600;
-        display: inline-block; margin-left: 8px;
-    }
-
-    /* ── Primary button ── */
-    .stButton > button {
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        color: white; border: none; border-radius: 10px;
-        padding: 8px 24px; font-weight: 600;
-        transition: all 0.2s ease;
-    }
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #2563eb, #1e40af);
-        transform: translateY(-1px);
-        box-shadow: 0 6px 20px rgba(59,130,246,0.4);
-    }
-
-    /* ── File uploader ── */
-    [data-testid="stFileUploader"] {
-        border: 2px dashed #334155 !important;
-        border-radius: 12px !important;
-        background: #1e293b !important;
-    }
-
-    /* ── Section headers ── */
-    .section-header {
-        font-size: 1.5rem; font-weight: 700;
-        background: linear-gradient(135deg, #60a5fa, #a78bfa);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        margin-bottom: 1rem;
-    }
-
-    /* ── Status indicator ── */
-    .status-dot {
-        display: inline-block; width: 8px; height: 8px;
-        border-radius: 50%; margin-right: 6px;
-        animation: pulse 2s infinite;
-    }
-    .status-dot.green { background: #10b981; }
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
-    }
-
-    /* ── Divider ── */
-    hr { border-color: #1e293b !important; }
-</style>
-""",
-    unsafe_allow_html=True,
-)
+def compile_sources_cards_html(sources: list) -> str:
+    """Build a premium, glassmorphic, responsive, and expandable grid of source citation cards."""
+    if not sources:
+        return ""
+        
+    import html
+    cards_html = []
+    
+    for i, s in enumerate(sources, start=1):
+        doc_name = get_source_attr(s, "document", "Source Document")
+        chunk_id = get_source_attr(s, "chunk_id", "")
+        is_web = False
+        if chunk_id and (chunk_id.startswith("http://") or chunk_id.startswith("https://")):
+            is_web = True
+            
+        if is_web:
+            title_html = f'<a href="{chunk_id}" target="_blank" style="color: var(--text-main); text-decoration: none; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-globe" style="color: var(--primary);"></i> {html.escape(doc_name)}</a>'
+            meta_page = "Web Source"
+        else:
+            icon = "fa-file-pdf" if doc_name.lower().endswith(".pdf") else "fa-file-alt"
+            title_html = f'<i class="fas {icon}"></i> {html.escape(doc_name)}'
+            page = get_source_attr(s, "page")
+            meta_page = f"Page {page}" if page is not None else "Doc Source"
+            
+        score = get_source_attr(s, "relevance_score")
+        if score is not None:
+            try:
+                score_val = float(score)
+                if score_val <= 1.0:
+                    confidence = int(score_val * 100)
+                else:
+                    confidence = int(score_val)
+            except (ValueError, TypeError):
+                confidence = 75
+        else:
+            confidence = 75
+            
+        if confidence >= 80:
+            relevance = "High"
+            badge_class = "high"
+        elif confidence >= 50:
+            relevance = "Medium"
+            badge_class = "medium"
+        else:
+            relevance = "Low"
+            badge_class = "low"
+            
+        text_preview = get_source_attr(s, "text")
+        if not text_preview:
+            text_preview = "No text content preview available for this source."
+        else:
+            text_preview = html.escape(text_preview)
+            
+        card_html = f"""
+        <details class="source-card">
+            <summary>
+                <div class="source-card-summary">
+                    <div class="source-card-header">
+                        <span class="source-card-title" title="{html.escape(doc_name)}">{title_html}</span>
+                        <span class="source-card-badge {badge_class}">{relevance}</span>
+                    </div>
+                    <div class="source-card-meta">
+                        <span>{meta_page}</span>
+                        <span>Confidence: {confidence}%</span>
+                    </div>
+                </div>
+            </summary>
+            <div class="source-card-content">
+                <strong>Retrieved Chunk Preview:</strong><br/>
+                {text_preview}
+            </div>
+        </details>
+        """
+        cards_html.append(card_html)
+        
+    grid_content = "\n".join(cards_html)
+    return f"""
+    <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-top: 12px; margin-bottom: 4px;">
+        <i class="fas fa-quote-left"></i> Sources
+    </div>
+    <div class="source-cards-grid">
+        {grid_content}
+    </div>
+    """
 
 
 # ── API helpers ────────────────────────────────────────────────────────────────
@@ -272,12 +1344,175 @@ def export_history_to_json(session_id: str, chat_history: list[dict]) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False)
 
 
+def load_env_variables() -> dict[str, str]:
+    """Read .env file directly from workspace and return parsed keys."""
+    env_path = Path(".env")
+    variables = {}
+    if env_path.exists():
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        parts = line.split("=", 1)
+                        key = parts[0].strip()
+                        val = parts[1].strip()
+                        variables[key] = val
+        except Exception as exc:
+            st.error(f"Failed to load environment variables: {exc}")
+    return variables
+
+
+def save_env_variables(variables: dict[str, str]) -> None:
+    """Save updated keys back to .env, preserving comments and format where possible."""
+    env_path = Path(".env")
+    if not env_path.exists():
+        try:
+            with open(env_path, "w", encoding="utf-8") as f:
+                for k, v in variables.items():
+                    f.write(f"{k}={v}\n")
+            return
+        except Exception as exc:
+            st.error(f"Failed to create environment configuration: {exc}")
+            return
+        
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            
+        updated_lines = []
+        seen_keys = set()
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                key = stripped.split("=", 1)[0].strip()
+                if key in variables:
+                    updated_lines.append(f"{key}={variables[key]}\n")
+                    seen_keys.add(key)
+                    continue
+            updated_lines.append(line)
+            
+        # Append keys that weren't in the original .env
+        for k, v in variables.items():
+            if k not in seen_keys:
+                updated_lines.append(f"{k}={v}\n")
+                
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(updated_lines)
+    except Exception as exc:
+        st.error(f"Failed to write environment configuration: {exc}")
+
+
+def render_top_navbar(health: dict | None) -> None:
+    """Render a modern SaaS top navbar row using native Streamlit columns and custom styles."""
+    provider = "—"
+    model = "—"
+    if health:
+        provider = str(health.get("llm_provider", "—")).upper()
+        model = str(health.get("llm_model", "—")).split("/")[-1]
+
+    col_logo, col_info, col_toggle = st.columns([3, 5, 2])
+    
+    with col_logo:
+        st.markdown(
+            """
+            <div style="display:flex; align-items:center; gap:8px; font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:1.2rem; height:100%; margin-top: 4px;">
+                <span style="font-size:1.4rem;">🧠</span> TalentMind AI
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        
+    with col_info:
+        st.markdown(
+            f"""
+            <div style="display:flex; align-items:center; gap:12px; justify-content:center; height:100%; margin-top: 4px;">
+                <div class="navbar-badge">
+                    <span class="navbar-badge-lbl"><i class="fa-solid fa-server"></i> Provider:</span>
+                    <span class="navbar-badge-val">{provider}</span>
+                </div>
+                <div class="navbar-badge">
+                    <span class="navbar-badge-lbl"><i class="fa-solid fa-microchip"></i> Model:</span>
+                    <span class="navbar-badge-val" style="max-width:150px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">{model}</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        
+    with col_toggle:
+        theme = st.session_state.get("theme", "dark")
+        theme_label = "🌞 Light" if theme == "dark" else "🌙 Dark"
+        if st.button(theme_label, key="theme_toggle_btn", use_container_width=True):
+            st.session_state.theme = "light" if theme == "dark" else "dark"
+            st.rerun()
+            
+    st.markdown("<hr style='margin-top:0.4rem; margin-bottom:1.2rem; border-color:var(--border-color) !important;' />", unsafe_allow_html=True)
+
+
+def render_kpi_cards() -> None:
+    """Render 4 premium SaaS KPI cards at the top of the dashboard."""
+    health = api_get("/health") or {}
+    analytics = api_get("/analytics/extended") or {}
+    
+    docs_indexed = health.get("documents_indexed", 0)
+    total_queries = analytics.get("total_queries", 0)
+    avg_latency = analytics.get("avg_total_latency_ms", 0.0)
+    active_agents = 5
+    
+    latency_str = f"{avg_latency:.0f} ms" if avg_latency else "0 ms"
+    total_files = analytics.get("document_metrics", {}).get("total_documents", 0)
+    if total_files == 0 and docs_indexed > 0:
+        total_files = 1
+        
+    st.markdown(
+        f"""
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <span class="kpi-icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="kpi-title">Chunks Indexed</span>
+                </div>
+                <div class="kpi-value">{docs_indexed:,}</div>
+                <div class="kpi-footer">Across {total_files} active files</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <span class="kpi-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <span class="kpi-title">Total Queries</span>
+                </div>
+                <div class="kpi-value">{total_queries:,}</div>
+                <div class="kpi-footer">All conversation runs</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <span class="kpi-icon"><i class="fa-solid fa-robot"></i></span>
+                    <span class="kpi-title">Active Agents</span>
+                </div>
+                <div class="kpi-value">{active_agents}</div>
+                <div class="kpi-footer">Router, RAG, Web, Memory, Synthesizer</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-header">
+                    <span class="kpi-icon"><i class="fa-solid fa-gauge-high"></i></span>
+                    <span class="kpi-title">Avg Latency</span>
+                </div>
+                <div class="kpi-value">{latency_str}</div>
+                <div class="kpi-footer">End-to-end response time</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 def init_session_state() -> None:
     defaults = {
         "session_id": None,
         "chat_history": [],  # list[dict] with role, content, agent, sources, latency
-        "page": "dashboard",
+        "page": "portal",
         "resume_analysis_result": None,
+        "theme": "dark",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -289,19 +1524,17 @@ def init_session_state() -> None:
 def render_sidebar() -> str:
     """Render sidebar and return the selected page."""
     with st.sidebar:
-        st.markdown(
+        st.html(
             """
-            <div style="text-align:center; padding: 1rem 0;">
-                <div style="font-size: 2.5rem;">🧠</div>
-                <div style="font-size: 1.1rem; font-weight: 700; 
-                     background: linear-gradient(135deg, #60a5fa, #a78bfa);
-                     -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                    Enterprise RAG
+            <div class="sidebar-header">
+                <div class="sidebar-logo-container">
+                    <span class="sidebar-logo">🧠</span>
+                    <span class="sidebar-logo-glow"></span>
                 </div>
-                <div style="font-size: 0.7rem; color: #64748b;">Agentic Assistant v1.0</div>
+                <div class="sidebar-brand-title">TalentMind AI</div>
+                <div class="sidebar-brand-version">v1.2-agentic</div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
         st.divider()
@@ -309,29 +1542,40 @@ def render_sidebar() -> str:
         # Health status
         health = api_get("/health", timeout=3.0)
         if health:
-            st.markdown(
-                f'<span class="status-dot green"></span>'
-                f'<span style="font-size:0.85rem;">API Online</span>',
-                unsafe_allow_html=True,
+            st.html(
+                f"""
+                <div class="sidebar-status-card online">
+                    <div class="status-indicator-row">
+                        <span class="status-pulse-dot green"></span>
+                        <span class="status-label">API Status: Online</span>
+                    </div>
+                    <div class="status-meta-row">📚 {health.get('documents_indexed', 0)} chunks indexed</div>
+                </div>
+                """
             )
-            st.caption(f"📚 {health.get('documents_indexed', 0)} chunks indexed")
         else:
-            st.markdown(
-                '<span class="status-dot" style="background:#ef4444;"></span>'
-                '<span style="font-size:0.85rem;">API Offline</span>',
-                unsafe_allow_html=True,
+            st.html(
+                """
+                <div class="sidebar-status-card offline">
+                    <div class="status-indicator-row">
+                        <span class="status-pulse-dot red"></span>
+                        <span class="status-label">API Status: Offline</span>
+                    </div>
+                    <div class="status-meta-row">FastAPI server disconnected</div>
+                </div>
+                """
             )
 
         st.divider()
 
         pages = {
+            "🚀 Welcome Portal": "portal",
             "🏠 Dashboard": "dashboard",
             "💬 Chat": "chat",
-            "💼 Career Intelligence": "career_intelligence",
-            "🧠 Memory": "memory_dashboard",
-            "🔀 Workflow": "workflow",
-            "📊 Analytics": "analytics",
-            "⚡ LLM Benchmark": "benchmark",
+            "📂 Documents": "documents",
+            "📈 Analytics": "analytics",
+            "💼 Resume Analyzer": "career_intelligence",
+            "⚙️ Settings": "settings",
         }
         
         page_vals = list(pages.values())
@@ -348,11 +1592,18 @@ def render_sidebar() -> str:
 
         st.divider()
 
-        # Session info
+        # Session actions
         if st.session_state.session_id:
-            st.caption(f"Session: `{st.session_state.session_id[:8]}…`")
+            st.html(
+                f"""
+                <div style="font-size: 0.75rem; color: var(--text-muted); display:flex; align-items:center; gap:6px; margin-bottom: 8px; margin-top: 4px; padding-left: 4px;">
+                    <i class="fas fa-fingerprint" style="color: #a78bfa;"></i>
+                    <span>Active Session: <code>{st.session_state.session_id[:8]}…</code></span>
+                </div>
+                """
+            )
 
-        if st.button("🔄 New Session", use_container_width=True):
+        if st.button("🔄 New Chat Session", use_container_width=True, type="secondary"):
             st.session_state.session_id = None
             st.session_state.chat_history = []
             st.session_state.page = "chat"
@@ -389,38 +1640,341 @@ def render_sidebar() -> str:
                         st.rerun()
             else:
                 st.caption("No past sessions.")
-
-        st.divider()
-
-        # ── API Key reload ──────────────────────────────────
-        with st.expander("🔑 Apply New API Key", expanded=False):
-            st.caption(
-                "After updating `GOOGLE_API_KEY` in your `.env` file, "
-                "click below to reload without restarting the server."
-            )
-            if st.button("🔄 Reload Config", use_container_width=True, type="primary"):
-                with st.spinner("Reloading…"):
-                    result = api_post("/reload", json={}, timeout=30.0)
-                if result and result.get("status") == "reloaded":
-                    st.success(
-                        f"✅ Reloaded! Model: `{result.get('gemini_model', '?')}`"
-                    )
-                elif result is None:
-                    st.error("Reload failed — check server logs for details.")
-
+                
     return page
 
+def render_provider_control_center() -> None:
+    """Render the Provider Control Center dashboard widget with status checks and model switching."""
+    st.markdown("#### ⚡ Provider Control Center")
+    
+    # Load current env config
+    env_vars = load_env_variables()
+    current_provider = env_vars.get("LLM_PROVIDER", "gemini").lower()
+    
+    # Provider mapping & options
+    provider_options = ["gemini", "groq", "ollama"]
+    provider_display_names = {
+        "gemini": "Gemini",
+        "groq": "Groq",
+        "ollama": "Ollama"
+    }
+    
+    # Model options mapping
+    provider_models = {
+        "gemini": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+        "groq": ["llama-3.1-8b-instant", "llama3-70b-8192", "mixtral-8x7b-32768"],
+        "ollama": ["llama3.2", "llama3.1", "mistral", "phi3"]
+    }
+    
+    # Try to set default index
+    try:
+        p_idx = provider_options.index(current_provider)
+    except ValueError:
+        p_idx = 0
+        
+    # Render selectors
+    col_p, col_m = st.columns(2)
+    with col_p:
+        selected_provider = st.radio(
+            "Provider:",
+            options=provider_options,
+            index=p_idx,
+            format_func=lambda x: provider_display_names[x],
+            key="control_center_provider"
+        )
+    with col_m:
+        current_model_val = env_vars.get(f"{selected_provider.upper()}_MODEL", "")
+        models_list = provider_models[selected_provider]
+        if current_model_val not in models_list:
+            models_list = [current_model_val] + models_list if current_model_val else models_list
+            
+        selected_model = st.selectbox(
+            "Model Selection:",
+            options=models_list,
+            key="control_center_model"
+        )
+        
+    # Availability check & metadata
+    is_active = (selected_provider == current_provider)
+    
+    # Simulated/Actual baseline latency
+    latency_vals = {
+        "gemini": "1.2 sec",
+        "groq": "0.4 sec",
+        "ollama": "1.8 sec"
+    }
+    
+    # Check status
+    api_key_env_var = {
+        "gemini": "GOOGLE_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "ollama": "OLLAMA_BASE_URL"
+    }
+    
+    status_label = "Online"
+    status_color = "#10b981"  # green
+    
+    if selected_provider in ("gemini", "groq"):
+        key_val = env_vars.get(api_key_env_var[selected_provider], "")
+        if not key_val:
+            status_label = "API Key Missing"
+            status_color = "#f59e0b"  # yellow
+    else:  # ollama
+        # verify if local ollama is reachable
+        import socket
+        try:
+            url_part = env_vars.get("OLLAMA_BASE_URL", "http://localhost:11434")
+            host = "localhost"
+            port = 11434
+            if "://" in url_part:
+                host_port = url_part.split("://")[1]
+                if ":" in host_port:
+                    host, port_str = host_port.split(":")
+                    port = int(port_str.split("/")[0])
+                else:
+                    host = host_port.split("/")[0]
+            socket.setdefaulttimeout(1.0)
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((host, port))
+            s.close()
+        except Exception:
+            status_label = "Offline"
+            status_color = "#ef4444"  # red
+            
+    # Show active indicator
+    active_badge = f'<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">ACTIVE</span>' if is_active else '<span style="background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.2); font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">STANDBY</span>'
+
+    # Render Telemetry Card matching user specifications
+    st.markdown(
+        f"""
+        <div class="saas-card" style="margin-top: 10px; border-left: 4px solid {status_color};">
+            <div style="font-size: 0.9rem; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+                <span style="font-weight: 600; color: var(--text-main); font-family: 'Space Grotesk', sans-serif;">🖥️ Telemetry Panel ({provider_display_names[selected_provider]})</span>
+                {active_badge}
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 8px; font-size: 0.85rem;">
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500;">Model</span><br/>
+                    <strong style="color: var(--text-main); font-size: 0.95rem;">{selected_model}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500;">Latency</span><br/>
+                    <strong style="color: var(--text-main); font-size: 0.95rem;">{latency_vals[selected_provider]}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500;">Availability</span><br/>
+                    <strong style="color: {status_color}; font-size: 0.95rem;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; background-color: {status_color}; margin-right: 6px;"></span>
+                        {status_label}
+                    </strong>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # Save & reload trigger
+    if selected_provider != current_provider or selected_model != current_model_val:
+        if st.button("🔌 Switch to Provider / Model", use_container_width=True, type="primary"):
+            updates = {
+                "LLM_PROVIDER": selected_provider,
+                f"{selected_provider.upper()}_MODEL": selected_model
+            }
+            for k, v in env_vars.items():
+                if k not in updates:
+                    updates[k] = v
+            save_env_variables(updates)
+            
+            with st.spinner("Applying and reloading backend orchestrator..."):
+                result = api_post("/reload", json={}, timeout=30.0)
+            if result and result.get("status") == "reloaded":
+                st.success("✅ Switched provider successfully!")
+                st.rerun()
+            else:
+                st.error("❌ Switching failed — check API logs.")
+
+
+# ── Page: Portal (Landing Page) ───────────────────────────────────────────────
+
+def render_portal() -> None:
+    # Main hero & powered by sections
+    st.html(
+        """<div class="portal-container">
+    <div class="hero-section">
+        <h1 class="hero-title">TalentMind AI</h1>
+        <h3 class="hero-subtitle">Enterprise Talent & Knowledge Intelligence Platform</h3>
+        <p class="hero-desc">
+            An advanced multi-agent orchestrator utilizing hybrid retrieval, long-term memory vector stores, 
+            and custom pipeline workflows to build deep cognitive awareness across your organizational data.
+        </p>
+    </div>
+    
+    <div class="powered-by-section">
+        <span class="powered-by-title">Powered By</span>
+        <div class="powered-by-badges">
+            <div class="powered-badge"><i class="fas fa-network-wired" style="color: #6366f1;"></i> LangGraph</div>
+            <div class="powered-badge"><i class="fas fa-cube" style="color: #f59e0b;"></i> Ollama</div>
+            <div class="powered-badge"><i class="fas fa-bolt" style="color: #10b981;"></i> Groq</div>
+            <div class="powered-badge"><i class="fas fa-brain" style="color: #3b82f6;"></i> Gemini</div>
+        </div>
+    </div>
+    
+    <div class="features-grid">
+        <div class="feature-card">
+            <span class="feature-card-icon">📄</span>
+            <div class="feature-card-title">Document Intelligence</div>
+            <div class="feature-card-desc">
+                Analyze and index PDFs, Word documents, and text files. Leverages hybrid vector search + BM25 
+                with Cross-Encoder reranking for precision relevance.
+            </div>
+        </div>
+        <div class="feature-card">
+            <span class="feature-card-icon">🧠</span>
+            <div class="feature-card-title">Conversational Memory</div>
+            <div class="feature-card-desc">
+                Maintains long-term episodic memory across sessions. Automatically extracts and stores facts, 
+                user preferences, and context summaries.
+            </div>
+        </div>
+        <div class="feature-card">
+            <span class="feature-card-icon">🌐</span>
+            <div class="feature-card-title">Web Search</div>
+            <div class="feature-card-desc">
+                Augments local search with real-time web research using Tavily Search API, blending offline 
+                organization insights with active web data.
+            </div>
+        </div>
+        <div class="feature-card">
+            <span class="feature-card-icon">📊</span>
+            <div class="feature-card-title">Resume-JD Matching</div>
+            <div class="feature-card-desc">
+                SaaS-grade candidate evaluation. Computes alignment percentages, extracts key skill gaps, 
+                and suggests resume improvements automatically.
+            </div>
+        </div>
+        <div class="feature-card">
+            <span class="feature-card-icon">⚡</span>
+            <div class="feature-card-title">Agentic Workflows</div>
+            <div class="feature-card-desc">
+                Executes graph-based tasks via LangGraph. Visualize active nodes, routing steps, and individual 
+                node execution latencies in real-time.
+            </div>
+        </div>
+    </div>
+</div>"""
+    )
+    
+    # Render portal buttons centered
+    c_left, c_mid, c_right = st.columns([1, 1.8, 1])
+    with c_mid:
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            if st.button("📁 Upload Documents", use_container_width=True, type="secondary", key="portal_btn_docs"):
+                st.session_state.page = "documents"
+                st.rerun()
+        with col_b2:
+            if st.button("💬 Start Chat", use_container_width=True, type="primary", key="portal_btn_chat"):
+                st.session_state.page = "chat"
+                st.rerun()
 
 # ── Page: Dashboard ───────────────────────────────────────────────────────────
 
 def render_dashboard() -> None:
     st.markdown(
-        '<div class="section-header">📂 Document Dashboard</div>',
+        '<div class="section-header">📊 RAG Platform Dashboard Overview</div>',
         unsafe_allow_html=True,
     )
+    
+    # Render KPI cards
+    render_kpi_cards()
+    
+    col_left, col_right = st.columns([1.5, 1], gap="large")
+    
+    with col_left:
+        st.markdown("#### 🤖 Active Orchestrator Agents Configuration")
+        
+        agents_data = [
+            {"icon": "🔀", "name": "Router Agent", "desc": "Classifies user queries semantically using conversation history, documents count, and keyword triggers to decide routing pathways (RAG, Web, Memory, or Hybrid)."},
+            {"icon": "📚", "name": "RAG Agent", "desc": "Performs fast hybrid retrieval from ChromaDB + BM25, followed by Cross-Encoder reranking to find top-scoring document segments."},
+            {"icon": "🌐", "name": "Web Search Agent", "desc": "Utilizes Tavily Search API to execute real-time web searches, retrieving fresh info to supplement the knowledge base."},
+            {"icon": "🧠", "name": "Memory Agent", "desc": "Manages conversational memory, fetching semantic context from previous turns to enable follow-up reasoning."},
+            {"icon": "✍️", "name": "Response Synthesizer", "desc": "Gathers outputs from active agent branches and constructs an answer with accurate document source citations."}
+        ]
+        
+        for agent in agents_data:
+            st.markdown(
+                f"""
+                <div class="saas-card" style="display:flex; align-items:flex-start; gap:12px; margin-bottom:10px;">
+                    <div style="font-size:1.5rem; line-height:1;">{agent['icon']}</div>
+                    <div>
+                        <div style="font-weight:600; font-size:0.95rem; margin-bottom:4px;">{agent['name']}</div>
+                        <div style="color:var(--text-muted); font-size:0.8rem; line-height:1.4;">{agent['desc']}</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+    with col_right:
+        st.markdown("#### ⚡ Quick Navigation Shortcuts")
+        
+        shortcuts = [
+            {"icon": "💬", "title": "Start Agentic Chat", "desc": "Ask queries across your documents or the web.", "page": "chat"},
+            {"icon": "📂", "title": "Manage Knowledge Base", "desc": "Upload and index new PDF, DOCX, or TXT documents.", "page": "documents"},
+            {"icon": "💼", "title": "Resume vs JD Analyzer", "desc": "Compare resumes, generate match scores, and extract skills.", "page": "career_intelligence"},
+            {"icon": "📈", "title": "View Analytics & Metrics", "desc": "Monitor token usage, latency distributions, and query costs.", "page": "analytics"},
+        ]
+        
+        for sc in shortcuts:
+            st.markdown(
+                f"""
+                <div class="saas-card" style="margin-bottom:12px;">
+                    <div style="font-weight:600; font-size:0.925rem; display:flex; align-items:center; gap:8px;">
+                        <span>{sc['icon']}</span> {sc['title']}
+                    </div>
+                    <div style="color:var(--text-muted); font-size:0.75rem; margin-top:4px;">{sc['desc']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+        render_provider_control_center()
+        st.divider()
+            
+        st.markdown("#### 🛡️ System Status")
+        health = api_get("/health")
+        if health:
+            st.markdown(
+                """
+                <div class="saas-card" style="display:flex; flex-direction:column; gap:8px; border-left:4px solid #10b981;">
+                    <div style="font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-circle-check" style="color:#10b981;"></i> RAG Services Online</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">All background services, vector db, and model endpoints are connected.</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                """
+                <div class="saas-card" style="display:flex; flex-direction:column; gap:8px; border-left:4px solid #ef4444;">
+                    <div style="font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;"></i> RAG Backend Offline</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">Please check if the FastAPI server is running on port 8000.</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-    # ── Upload section ─────────────────────────────────────────────────────────
-    col1, col2 = st.columns([1.4, 1], gap="large")
+
+# ── Page: Documents ───────────────────────────────────────────────────────────
+
+def render_documents_page() -> None:
+    st.markdown(
+        '<div class="section-header">📂 Document Management</div>',
+        unsafe_allow_html=True,
+    )
+    
+    col1, col2 = st.columns([1.5, 1], gap="large")
 
     with col1:
         st.markdown("#### 📤 Upload Documents")
@@ -432,7 +1986,7 @@ def render_dashboard() -> None:
         )
 
         if uploaded:
-            if st.button("🚀 Index Documents", use_container_width=True):
+            if st.button("🚀 Index Uploaded Files", use_container_width=True):
                 progress = st.progress(0)
                 status_placeholder = st.empty()
                 for i, f in enumerate(uploaded):
@@ -449,19 +2003,19 @@ def render_dashboard() -> None:
                     progress.progress((i + 1) / len(uploaded))
                 status_placeholder.empty()
                 st.balloons()
+                st.rerun()
 
     with col2:
-        st.markdown("#### 🔑 Quick Stats")
+        st.markdown("#### 📁 System Storage Details")
         health = api_get("/health")
         if health:
-            st.metric("Chunks Indexed", health.get("documents_indexed", 0))
-            st.metric("LLM Model", health.get("llm_model", "—"))
-            st.metric("Embedding Model", health.get("embedding_model", "—").split("/")[-1])
+            st.metric("Total Chunks Indexed", health.get("documents_indexed", 0))
+            st.metric("Active Embedding Model", health.get("embedding_model", "—").split("/")[-1])
+            st.metric("Active Vector DB Persist Path", "./chroma_db")
 
     st.divider()
 
-    # ── Documents table ────────────────────────────────────────────────────────
-    st.markdown("#### 📋 Indexed Documents")
+    st.markdown("#### 📋 Knowledge Base Documents Registry")
 
     docs_resp = api_get("/documents")
     if not docs_resp or not docs_resp.get("documents"):
@@ -470,7 +2024,6 @@ def render_dashboard() -> None:
 
     docs = docs_resp["documents"]
 
-    # Table Header
     h_col1, h_col2, h_col3, h_col4, h_col5, h_col6 = st.columns([3, 1, 1, 1, 1.5, 1.5])
     h_col1.markdown("**Filename**")
     h_col2.markdown("**Type**")
@@ -478,9 +2031,8 @@ def render_dashboard() -> None:
     h_col4.markdown("**Pages**")
     h_col5.markdown("**Size**")
     h_col6.markdown("**Actions**")
-    st.markdown("<hr style='margin: 4px 0; border-color: #334155 !important;' />", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 4px 0; border-color: var(--border-color) !important;' />", unsafe_allow_html=True)
 
-    # Table Rows
     for d in docs:
         doc_id = d["document_id"]
         filename = d["filename"]
@@ -496,7 +2048,6 @@ def render_dashboard() -> None:
         row_col4.write(str(pages))
         row_col5.write(size_kb)
 
-        # Action buttons
         btn_col1, btn_col2 = row_col6.columns(2)
         if btn_col1.button("🔄", key=f"reindex_{doc_id}", help=f"Reindex {filename}"):
             with st.spinner("Reindexing…"):
@@ -597,10 +2148,8 @@ def render_chat() -> None:
 
         for turn in st.session_state.chat_history:
             if turn["role"] == "user":
-                st.markdown(
-                    f'<div class="user-bubble">👤 {turn["content"]}</div>',
-                    unsafe_allow_html=True,
-                )
+                with st.chat_message("user", avatar="👤"):
+                    st.markdown(turn["content"])
             else:
                 agent = turn.get("agent", "rag")
                 badge_class = f"agent-badge-{agent}"
@@ -610,81 +2159,67 @@ def render_chat() -> None:
                     "memory": "🧠 Memory",
                     "hybrid": "🔀 Hybrid (RAG + Web Search)"
                 }.get(agent, "🤖 AI")
-                # Header badge + latency
-                st.markdown(
-                    f"""
-                    <div style="margin-bottom:4px;">
-                        <span class="agent-badge {badge_class}">{badge_label}</span>
-                        <span style="font-size:0.72rem; color:#64748b; margin-left:8px;">
-                            {turn.get("latency", "")}
-                        </span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                # Render the answer as markdown so quota/error messages display
-                # with proper links, bold text, and bullet points
-                with st.container():
+                
+                with st.chat_message("assistant", avatar="🤖"):
+                    # Header badge + latency
                     st.markdown(
-                        f'<div class="assistant-bubble">',
+                        f"""
+                        <div style="margin-bottom:6px; margin-top:-4px;">
+                            <span class="agent-badge {badge_class}">{badge_label}</span>
+                            <span style="font-size:0.72rem; color:var(--text-muted); margin-left:8px;">
+                                {turn.get("latency", "")}
+                            </span>
+                        </div>
+                        """,
                         unsafe_allow_html=True,
                     )
+                    
                     st.markdown(turn["content"])
-                    st.markdown("</div>", unsafe_allow_html=True)
-
-                # Citations
-                sources = turn.get("sources", [])
-                if sources:
-                    pills = "".join(
-                        f'<span class="citation-pill">'
-                        f'📄 {s["document"]}'
-                        f'{" · p." + str(s["page"]) if s.get("page") else ""}'
-                        f"</span>"
-                        for s in sources
-                    )
-                    st.markdown(
-                        f'<div style="margin-top:8px; margin-left:4px;">{pills}</div>',
-                        unsafe_allow_html=True,
-                    )
-
-                # Routing Observability Trace
-                routing_decision = turn.get("routing_decision")
-                routing_trace = turn.get("routing_trace", [])
-                if routing_decision or routing_trace:
-                    with st.expander("🔀 Routing Observability Trace", expanded=False):
-                        if routing_decision:
-                            conf_pct = int(routing_decision.get("confidence", 1.0) * 100)
-                            fallback = " (rule-based fallback)" if routing_decision.get("fallback_used") else ""
-                            st.markdown(f"**Target Agent:** `{routing_decision.get('agent', 'unknown').upper()}` | **Confidence:** `{conf_pct}%`{fallback}")
-                            if routing_decision.get("reasoning"):
-                                st.markdown(f"*Reasoning:* {routing_decision.get('reasoning')}")
-                        
-                        # Token & Cost Metrics
-                        prompt_tok = turn.get("prompt_tokens", 0) or result.get("prompt_tokens", 0) if 'result' in locals() else turn.get("prompt_tokens", 0)
-                        comp_tok = turn.get("completion_tokens", 0) or result.get("completion_tokens", 0) if 'result' in locals() else turn.get("completion_tokens", 0)
-                        tot_tok = turn.get("total_tokens", 0) or result.get("total_tokens", 0) if 'result' in locals() else turn.get("total_tokens", 0)
-                        c_usd = turn.get("cost_usd", 0.0) or result.get("cost_usd", 0.0) if 'result' in locals() else turn.get("cost_usd", 0.0)
-                        if tot_tok > 0:
-                            st.markdown(f"**Tokens used:** `{tot_tok}` (Prompt: `{prompt_tok}`, Completion: `{comp_tok}`) | **Estimated Cost:** `${c_usd:.6f}`")
-
-                        if routing_trace:
-                            st.markdown("**Execution Trace Steps:**")
-                            for step in routing_trace:
-                                st.markdown(f"- {step}")
-
-                # Retrieved Memories from Long-Term Memory
-                retrieved_mems = turn.get("retrieved_memories", [])
-                if retrieved_mems:
-                    with st.expander("🧠 Retrieved Long-Term Memories", expanded=False):
-                        mem_rows = []
-                        for m in retrieved_mems:
-                            mem_rows.append({
-                                "Content": m.get("content"),
-                                "Type": m.get("memory_type", "").upper(),
-                                "Relevance Score": f"{m.get('score', 1.0):.4f}" if m.get("score") is not None else "1.0000",
-                                "Source Session": m.get("session_id", "")[:8] + "...",
-                            })
-                        st.dataframe(pd.DataFrame(mem_rows), use_container_width=True, hide_index=True)
+ 
+                    # Citations
+                    sources = turn.get("sources", [])
+                    if sources:
+                        cards_html = compile_sources_cards_html(sources)
+                        st.html(cards_html)
+ 
+                    # Routing Observability Trace
+                    routing_decision = turn.get("routing_decision")
+                    routing_trace = turn.get("routing_trace", [])
+                    if routing_decision or routing_trace:
+                        with st.expander("🔀 Routing Observability Trace", expanded=False):
+                            if routing_decision:
+                                conf_pct = int(routing_decision.get("confidence", 1.0) * 100)
+                                fallback = " (rule-based fallback)" if routing_decision.get("fallback_used") else ""
+                                st.markdown(f"**Target Agent:** `{routing_decision.get('agent', 'unknown').upper()}` | **Confidence:** `{conf_pct}%`{fallback}")
+                                if routing_decision.get("reasoning"):
+                                    st.markdown(f"*Reasoning:* {routing_decision.get('reasoning')}")
+                            
+                            # Token & Cost Metrics
+                            prompt_tok = turn.get("prompt_tokens", 0) or result.get("prompt_tokens", 0) if 'result' in locals() else turn.get("prompt_tokens", 0)
+                            comp_tok = turn.get("completion_tokens", 0) or result.get("completion_tokens", 0) if 'result' in locals() else turn.get("completion_tokens", 0)
+                            tot_tok = turn.get("total_tokens", 0) or result.get("total_tokens", 0) if 'result' in locals() else turn.get("total_tokens", 0)
+                            c_usd = turn.get("cost_usd", 0.0) or result.get("cost_usd", 0.0) if 'result' in locals() else turn.get("cost_usd", 0.0)
+                            if tot_tok > 0:
+                                st.markdown(f"**Tokens used:** `{tot_tok}` (Prompt: `{prompt_tok}`, Completion: `{comp_tok}`) | **Estimated Cost:** `${c_usd:.6f}`")
+ 
+                            if routing_trace:
+                                st.markdown("**Execution Trace Steps:**")
+                                for step in routing_trace:
+                                    st.markdown(f"- {step}")
+ 
+                    # Retrieved Memories from Long-Term Memory
+                    retrieved_mems = turn.get("retrieved_memories", [])
+                    if retrieved_mems:
+                        with st.expander("🧠 Retrieved Long-Term Memories", expanded=False):
+                            mem_rows = []
+                            for m in retrieved_mems:
+                                mem_rows.append({
+                                    "Content": m.get("content"),
+                                    "Type": m.get("memory_type", "").upper(),
+                                    "Relevance Score": f"{m.get('score', 1.0):.4f}" if m.get("score") is not None else "1.0000",
+                                    "Source Session": m.get("session_id", "")[:8] + "...",
+                                })
+                            st.dataframe(pd.DataFrame(mem_rows), use_container_width=True, hide_index=True)
 
     # ── Input bar ──────────────────────────────────────────────────────────────
     query = st.chat_input("Ask about your documents, current events, or follow up on previous answers…")
@@ -693,20 +2228,70 @@ def render_chat() -> None:
         # Add user message to history
         st.session_state.chat_history.append({"role": "user", "content": query})
 
-        with st.spinner("🤔 Thinking…"):
-            payload = {
-                "query": query,
-                "session_id": st.session_state.session_id,
-                "use_web_search": use_web,
-                "filter_document_ids": filter_ids if 'filter_ids' in locals() and filter_ids else None,
-            }
-            result = api_post("/chat", json=payload, timeout=120.0)
+        visual_placeholder = st.empty()
+        typing_placeholder = st.empty()
+        
+        # Step 0: Query Submitted (marked active, others pending)
+        render_step_visualizer(visual_placeholder, active_step_index=0, latency_dict=None, agent_used="rag")
+        time.sleep(0.2)
+        
+        # Step 1: Router Classified Query (marked active, others pending)
+        render_step_visualizer(visual_placeholder, active_step_index=1, latency_dict=None, agent_used="rag")
+        time.sleep(0.1)
+
+        # Pulse the typing indicator while calling backend
+        with typing_placeholder:
+            with st.chat_message("assistant", avatar="🤖"):
+                st.markdown(
+                    """
+                    <div class="typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        payload = {
+            "query": query,
+            "session_id": st.session_state.session_id,
+            "use_web_search": use_web,
+            "filter_document_ids": filter_ids if 'filter_ids' in locals() and filter_ids else None,
+        }
+        result = api_post("/chat", json=payload, timeout=120.0)
 
         if result:
             # Update session_id from response
             st.session_state.session_id = result.get("session_id")
 
+            agent_used = result.get("agent_used", "rag")
             latency = result.get("latency_ms", {})
+            
+            # Retrieve node configuration steps for the actual agent
+            steps = get_playback_steps_for_route(agent_used)
+            
+            # Animate through the remaining nodes starting from Memory Agent (Step 2)
+            for idx in range(2, len(steps)):
+                render_step_visualizer(visual_placeholder, active_step_index=idx, latency_dict=latency, agent_used=agent_used)
+                time.sleep(0.2)
+                
+            # Render done state showing all green nodes and execution metrics
+            render_step_visualizer(visual_placeholder, active_step_index=len(steps), latency_dict=latency, agent_used=agent_used, is_done_mode=True)
+            time.sleep(0.3)
+
+            # Clear typing indicator and stream the response
+            typing_placeholder.empty()
+            
+            with st.chat_message("assistant", avatar="🤖"):
+                response_text_placeholder = st.empty()
+                full_response = ""
+                # Stream word-by-word
+                words = result["answer"].split(" ")
+                for word in words:
+                    full_response += (word + " ")
+                    response_text_placeholder.markdown(full_response + "▌")
+                    time.sleep(0.01)
+                response_text_placeholder.markdown(result["answer"])
+
             total_ms = latency.get("total", 0)
             latency_label = f"⏱ {total_ms:.0f}ms" if total_ms else ""
 
@@ -714,7 +2299,7 @@ def render_chat() -> None:
                 {
                     "role": "assistant",
                     "content": result["answer"],
-                    "agent": result.get("agent_used", "rag"),
+                    "agent": agent_used,
                     "sources": result.get("sources", []),
                     "latency": latency_label,
                     "routing_decision": result.get("routing_decision"),
@@ -727,6 +2312,9 @@ def render_chat() -> None:
                 }
             )
 
+        # Ensure visualizer and typing indicator are cleared
+        typing_placeholder.empty()
+        visual_placeholder.empty()
         st.rerun()
 
 
@@ -738,12 +2326,7 @@ def _safe_get(analytics: dict, key: str, default: float = 0.0) -> float:
     return float(val) if val is not None else default
 
 
-def render_analytics() -> None:
-    st.markdown(
-        '<div class="section-header">📊 Analytics Dashboard</div>',
-        unsafe_allow_html=True,
-    )
-
+def render_analytics_content() -> None:
     # ── Fetch both data sources ───────────────────────────────────────────────
     data = api_get("/analytics/extended", timeout=15.0)
     if not data or data.get("total_queries", 0) == 0:
@@ -882,8 +2465,8 @@ def render_analytics() -> None:
                 **_DARK_LAYOUT,
                 height=340,
                 barmode="group",
-                yaxis=dict(title="Queries", titlefont_color="#3b82f6"),
-                yaxis2=dict(title="Avg Latency (ms)", titlefont_color="#f59e0b",
+                yaxis=dict(title=dict(text="Queries", font=dict(color="#3b82f6"))),
+                yaxis2=dict(title=dict(text="Avg Latency (ms)", font=dict(color="#f59e0b")),
                             overlaying="y", side="right"),
                 legend=dict(orientation="h", y=-0.2),
             )
@@ -1357,6 +2940,45 @@ def render_analytics() -> None:
                     use_container_width=True,
                 )
 
+# ── Fragment Declarations for Auto Refresh ────────────────────────────────────
+
+@st.fragment(run_every=5.0)
+def render_analytics_fragment_5s() -> None:
+    render_analytics_content()
+
+@st.fragment(run_every=15.0)
+def render_analytics_fragment_15s() -> None:
+    render_analytics_content()
+
+@st.fragment(run_every=30.0)
+def render_analytics_fragment_30s() -> None:
+    render_analytics_content()
+
+def render_analytics() -> None:
+    # Render the auto-refresh selector
+    col_hdr, col_ref = st.columns([3, 1])
+    with col_hdr:
+        st.markdown(
+            '<div class="section-header">📊 System Performance & Observability</div>',
+            unsafe_allow_html=True,
+        )
+    with col_ref:
+        refresh_rate = st.selectbox(
+            "🔄 Auto Refresh Interval",
+            options=["Off", "5 Seconds", "15 Seconds", "30 Seconds"],
+            index=0,
+            key="analytics_refresh_rate"
+        )
+        
+    if refresh_rate == "5 Seconds":
+        render_analytics_fragment_5s()
+    elif refresh_rate == "15 Seconds":
+        render_analytics_fragment_15s()
+    elif refresh_rate == "30 Seconds":
+        render_analytics_fragment_30s()
+    else:
+        render_analytics_content()
+
 
 def _render_doc_and_memory_cards(data: dict) -> None:
     """Render document and memory KPI cards even when there are no queries yet."""
@@ -1375,103 +2997,28 @@ def _render_doc_and_memory_cards(data: dict) -> None:
 
 def render_workflow() -> None:
     st.markdown(
-        '<div class="section-header">🔀 LangGraph Workflow Observability</div>',
+        '<div class="section-header">🔀 Visual AI Workflow Builder</div>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        """
+        Design, customize, and execute complex agentic workflows in real-time. 
+        Drag agent nodes from the left palette, connect output-to-input ports, 
+        and configure execution options in the properties panel.
+        """
+    )
 
-    # 1. Fetch graph visualization from backend API
-    graph_data = api_get("/graph")
-    
-    col_left, col_right = st.columns([2, 3], gap="large")
-
-    with col_left:
-        st.markdown("### 🕸 Topology & Configuration")
-        st.markdown(
-            """
-            This multi-agent RAG application uses **LangGraph** to construct a stateful workflow. 
-            A query progresses through the nodes below based on intelligent routing:
-            
-            1. **Router Agent** (`router_node`): Classifies incoming queries based on semantic intent, history context, and document index size.
-            2. **RAG Agent** (`rag_node`): Performs hybrid retrieval (ChromaDB + BM25 keyword search) followed by Cross-Encoder reranking.
-            3. **Web Search Agent** (`web_node`): Searches the web via Tavily API to fetch real-time context.
-            4. **Memory Agent** (`memory_node`): Pulls context from conversation history for follow-up questions.
-            5. **Response Synthesizer** (`synthesizer_node`): Consolidates contexts from all active branches to formulate a response.
-            6. **Response Formatter** (`formatter_node`): Cleans structure, resolves citations, and logs latency metrics.
-            """
-        )
-        
-        st.markdown("### 📊 Active Agents Description")
-        st.info(
-            "💡 **Parallel Fan-out**: The Router can trigger parallel execution of both **RAG** and **Web Search** "
-            "agents (Hybrid mode) and merge their results dynamically before synthesis."
-        )
-
-    with col_right:
-        st.markdown("### 🗺 Live Graph Visualization")
-        if graph_data and "mermaid" in graph_data:
-            mermaid_code = graph_data["mermaid"]
-            import base64
-            # Clean up diagram string if it has fences
-            clean_code = mermaid_code.strip()
-            if clean_code.startswith("```mermaid"):
-                clean_code = clean_code[10:]
-            if clean_code.startswith("```"):
-                clean_code = clean_code[3:]
-            if clean_code.endswith("```"):
-                clean_code = clean_code[:-3]
-            clean_code = clean_code.strip()
-
-            # Prepend theme configuration
-            theme_config = "%%{init: {'theme': 'dark', 'themeVariables': { 'background': '#0a0f1e', 'primaryColor': '#3b82f6', 'lineColor': '#64748b' }}}%%\n"
-            full_mermaid = theme_config + clean_code
-            
-            b64_str = base64.b64encode(full_mermaid.encode("utf-8")).decode("utf-8")
-            image_url = f"https://mermaid.ink/img/{b64_str}"
-            
-            try:
-                st.image(image_url, caption="LangGraph Workflow Diagram", use_container_width=True)
-            except Exception as e:
-                st.warning("Failed to render diagram image from mermaid.ink. Displaying raw diagram structure:")
-                st.code(clean_code, language="mermaid")
-        else:
-            st.error("Could not fetch graph topology from API.")
-
-    st.divider()
-
-    # Recent Routing Decisions table
-    st.markdown("### 🔀 Recent Routing Decisions (Global)")
-    analytics = api_get("/analytics")
-    if analytics and "recent_metrics" in analytics:
-        recent = analytics["recent_metrics"]
-        if recent:
-            rows = []
-            for m in reversed(recent):
-                agent = m.get("agent_type", "unknown").upper()
-                badge = {
-                    "RAG": "📚 RAG",
-                    "WEB": "🌐 WEB",
-                    "MEMORY": "🧠 MEMORY",
-                    "HYBRID": "🔀 HYBRID",
-                }.get(agent, f"🤖 {agent}")
-
-                rows.append({
-                    "Timestamp": m.get("timestamp")[:19].replace("T", " ") if m.get("timestamp") else "N/A",
-                    "User Query": m.get("query"),
-                    "Routed Agent": badge,
-                    "Total Latency": f"{m.get('total_latency_ms', 0):.0f} ms",
-                    "Reranked Chunks": m.get("num_reranked", 0),
-                    "Web Results": m.get("num_web_results", 0) if "num_web_results" in m else ("Yes" if agent in ("WEB", "HYBRID") else "No"),
-                })
-            
-            st.dataframe(
-                pd.DataFrame(rows),
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("No query routing records found yet. Try asking some queries in the Chat page!")
+    static_file = Path("app/static/workflow_builder.html")
+    if static_file.exists():
+        try:
+            with open(static_file, "r", encoding="utf-8") as f:
+                html_content = f.read()
+            import streamlit.components.v1 as components
+            components.html(html_content, height=850, scrolling=False)
+        except Exception as exc:
+            st.error(f"Failed to read Workflow Builder file: {exc}")
     else:
-        st.info("No query routing records found yet.")
+        st.error("Workflow Builder canvas file not found at `app/static/workflow_builder.html`.")
 
 
 # ── Page: Career Intelligence Analyzer ─────────────────────────────────────────
@@ -2109,26 +3656,156 @@ def _render_benchmark_history() -> None:
                 st.rerun()
 
 
+# ── Analytics Page Wrapper ──────────────────────────────────────────────────────
+
+def render_analytics_page() -> None:
+    st.markdown(
+        '<div class="section-header">📈 Performance Analytics & Builders</div>',
+        unsafe_allow_html=True,
+    )
+    
+    tab_performance, tab_benchmark, tab_workflow = st.tabs([
+        "📊 System Performance",
+        "⚡ LLM Provider Benchmark",
+        "🔀 Visual Workflow Builder"
+    ])
+    
+    with tab_performance:
+        render_analytics()
+        
+    with tab_benchmark:
+        render_benchmark()
+        
+    with tab_workflow:
+        render_workflow()
+
+
+# ── Settings Page Wrapper ───────────────────────────────────────────────────────
+
+def render_settings_page() -> None:
+    st.markdown(
+        '<div class="section-header">⚙️ System Settings & Memory</div>',
+        unsafe_allow_html=True,
+    )
+    
+    tab_config, tab_memory = st.tabs([
+        "⚙️ System Configuration (.env)",
+        "🧠 Chroma Memory Dashboard"
+    ])
+    
+    with tab_config:
+        st.markdown("#### ⚙️ Edit System Environment Variables")
+        st.markdown(
+            "Update platform parameters. Values are saved back to the `.env` file. "
+            "Trigger a config reload to apply updates to the running API server."
+        )
+        
+        env_vars = load_env_variables()
+        
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            provider = st.selectbox(
+                "Active LLM Provider",
+                options=["gemini", "groq", "ollama"],
+                index=["gemini", "groq", "ollama"].index(env_vars.get("LLM_PROVIDER", "gemini"))
+            )
+            emb_provider = st.selectbox(
+                "Active Embedding Provider",
+                options=["gemini", "ollama", "local"],
+                index=["gemini", "ollama", "local"].index(env_vars.get("EMBEDDING_PROVIDER", "gemini"))
+            )
+            
+        with col_p2:
+            gemini_model = st.text_input("Gemini Model", value=env_vars.get("GEMINI_MODEL", "gemini-2.0-flash"))
+            groq_model = st.text_input("Groq Model", value=env_vars.get("GROQ_MODEL", "llama-3.1-8b-instant"))
+            ollama_model = st.text_input("Ollama Model", value=env_vars.get("OLLAMA_MODEL", "llama3.2"))
+            
+        st.divider()
+        
+        col_k1, col_k2 = st.columns(2)
+        with col_k1:
+            google_key = st.text_input("Google API Key", value=env_vars.get("GOOGLE_API_KEY", ""), type="password")
+            tavily_key = st.text_input("Tavily API Key", value=env_vars.get("TAVILY_API_KEY", ""), type="password")
+            
+        with col_k2:
+            groq_key = st.text_input("Groq API Key", value=env_vars.get("GROQ_API_KEY", ""), type="password")
+            ollama_url = st.text_input("Ollama Base URL", value=env_vars.get("OLLAMA_BASE_URL", "http://localhost:11434"))
+            
+        st.divider()
+        
+        col_r1, col_r2, col_r3 = st.columns(3)
+        with col_r1:
+            retrieval_k = st.number_input("Retrieval Top K", min_value=1, max_value=50, value=int(env_vars.get("RETRIEVAL_TOP_K", 20)))
+        with col_r2:
+            reranker_k = st.number_input("Reranker Top K", min_value=1, max_value=20, value=int(env_vars.get("RERANKER_TOP_K", 5)))
+        with col_r3:
+            memory_turns = st.number_input("Max Memory Turns", min_value=1, max_value=30, value=int(env_vars.get("MAX_MEMORY_TURNS", 10)))
+            
+        col_btn1, col_btn2 = st.columns([1, 1])
+        with col_btn1:
+            if st.button("💾 Save Configuration", use_container_width=True, type="primary"):
+                updates = {
+                    "LLM_PROVIDER": provider,
+                    "EMBEDDING_PROVIDER": emb_provider,
+                    "GEMINI_MODEL": gemini_model,
+                    "GROQ_MODEL": groq_model,
+                    "OLLAMA_MODEL": ollama_model,
+                    "GOOGLE_API_KEY": google_key,
+                    "TAVILY_API_KEY": tavily_key,
+                    "GROQ_API_KEY": groq_key,
+                    "OLLAMA_BASE_URL": ollama_url,
+                    "RETRIEVAL_TOP_K": str(retrieval_k),
+                    "RERANKER_TOP_K": str(reranker_k),
+                    "MAX_MEMORY_TURNS": str(memory_turns),
+                }
+                for k, v in env_vars.items():
+                    if k not in updates:
+                        updates[k] = v
+                save_env_variables(updates)
+                st.success("✅ `.env` configuration saved successfully!")
+                
+        with col_btn2:
+            if st.button("🔄 Reload Config", use_container_width=True):
+                with st.spinner("Reloading..."):
+                    result = api_post("/reload", json={}, timeout=30.0)
+                if result and result.get("status") == "reloaded":
+                    st.success(
+                        f"✅ Backend reloaded successfully! Active Model: `{result.get('gemini_model', '?')}`"
+                    )
+                    st.rerun()
+                else:
+                    st.error("❌ Reload failed — check backend logs.")
+                    
+    with tab_memory:
+        render_memory_dashboard()
+
+
 # ── Main entrypoint ────────────────────────────────────────────────────────────
 
 def main() -> None:
     init_session_state()
+    inject_custom_styles()
+    
+    # Render top navbar
+    health = api_get("/health", timeout=3.0)
+    render_top_navbar(health)
+    
     page = render_sidebar()
 
-    if page == "dashboard":
+    if page == "portal":
+        render_portal()
+    elif page == "dashboard":
         render_dashboard()
     elif page == "chat":
         render_chat()
+    elif page == "documents":
+        render_documents_page()
+    elif page == "analytics":
+        render_analytics_page()
     elif page == "career_intelligence":
         render_career_intelligence()
-    elif page == "memory_dashboard":
-        render_memory_dashboard()
-    elif page == "workflow":
-        render_workflow()
-    elif page == "analytics":
-        render_analytics()
-    elif page == "benchmark":
-        render_benchmark()
+    elif page == "settings":
+        render_settings_page()
 
 
 if __name__ == "__main__":

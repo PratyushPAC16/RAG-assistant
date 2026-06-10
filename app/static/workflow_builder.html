@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual AI Workflow Builder</title>
+  
+  <!-- Font and Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  
+  <!-- React & ReactFlow CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.11.2/dist/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/reactflow@11.11.2/dist/umd/index.min.js"></script>
+
+  <style>
+    :root {
+      --bg-main: #0e1117;
+      --bg-sidebar: #161920;
+      --bg-card: #21242d;
+      --bg-input: #1b1e26;
+      --text-main: #f0f2f6;
+      --text-muted: #8a99ad;
+      --border-color: #2f3542;
+      --primary: #4a6fa5;
+      
+      --color-router: #3b82f6;
+      --color-rag: #10b981;
+      --color-memory: #8b5cf6;
+      --color-web: #f97316;
+      --color-llm: #ec4899;
+      --color-evaluator: #eab308;
+      
+      --font-family: 'Outfit', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background-color: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .header-logo i {
+      color: var(--color-router);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .input-flat {
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: var(--font-family);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-flat:focus {
+      border-color: var(--primary);
+    }
+
+    .btn {
+      background-color: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-family: var(--font-family);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .btn:hover {
+      background-color: #5a7fb5;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-success {
+      background-color: var(--color-rag);
+    }
+    .btn-success:hover {
+      background-color: #059669;
+    }
+
+    .btn-danger {
+      background-color: #ef4444;
+    }
+    .btn-danger:hover {
+      background-color: #dc2626;
+    }
+
+    .app-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar */
+    .sidebar-left {
+      width: 260px;
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    .sidebar-section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .node-palette-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .palette-item {
+      padding: 12px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: grab;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color 0.2s, transform 0.1s;
+    }
+
+    .palette-item:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .palette-item-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .palette-item-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .badge-router { background-color: var(--color-router); }
+    .badge-rag { background-color: var(--color-rag); }
+    .badge-memory { background-color: var(--color-memory); }
+    .badge-web { background-color: var(--color-web); }
+    .badge-llm { background-color: var(--color-llm); }
+    .badge-evaluator { background-color: var(--color-evaluator); }
+
+    /* Canvas Area */
+    .canvas-container {
+      flex: 1;
+      height: 100%;
+      background-color: var(--bg-main);
+      position: relative;
+    }
+
+    /* Right Config Sidebar */
+    .sidebar-right {
+      width: 320px;
+      background-color: var(--bg-sidebar);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 5;
+    }
+
+    .config-panel-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .config-panel-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .form-control {
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px;
+      border-radius: 6px;
+      font-family: var(--font-family);
+      font-size: 14px;
+      outline: none;
+      width: 100%;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary);
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* Custom Node styling */
+    .custom-node {
+      padding: 12px;
+      border-radius: 8px;
+      background-color: var(--bg-card);
+      border: 2px solid var(--border-color);
+      color: var(--text-main);
+      min-width: 170px;
+      font-family: var(--font-family);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    .custom-node.selected {
+      border-color: var(--primary);
+    }
+
+    .custom-node-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .custom-node-body {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .custom-node-status {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #fff;
+    }
+
+    .status-running {
+      background-color: #3b82f6;
+      animation: pulse-glow 1s infinite alternate;
+    }
+
+    .status-done {
+      background-color: var(--color-rag);
+    }
+
+    .status-error {
+      background-color: #ef4444;
+    }
+
+    @keyframes pulse-glow {
+      0% { box-shadow: 0 0 4px #3b82f6; }
+      100% { box-shadow: 0 0 12px #3b82f6; }
+    }
+
+    /* Execution Overlay Logs */
+    .execution-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 220px;
+      background-color: var(--bg-sidebar);
+      border-top: 1px solid var(--border-color);
+      z-index: 8;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .execution-header {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      background-color: rgba(0,0,0,0.15);
+    }
+
+    .execution-body {
+      flex: 1;
+      padding: 12px 16px;
+      overflow-y: auto;
+      display: flex;
+      gap: 16px;
+    }
+
+    .execution-steps {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-right: 1px solid var(--border-color);
+      padding-right: 16px;
+    }
+
+    .execution-step-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background-color: rgba(255,255,255,0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .execution-step-item.running {
+      border-color: var(--color-router);
+    }
+    .execution-step-item.done {
+      border-color: var(--color-rag);
+    }
+    .execution-step-item.error {
+      border-color: #ef4444;
+    }
+
+    .execution-output-viewer {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .output-pre {
+      flex: 1;
+      background-color: var(--bg-main);
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      font-family: monospace;
+      font-size: 11px;
+      overflow: auto;
+      color: #a6e22e;
+      white-space: pre-wrap;
+    }
+
+    /* Helper styles */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+      gap: 12px;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .empty-state i {
+      font-size: 40px;
+      color: var(--border-color);
+    }
+
+    /* Edge Pulse Keyframes */
+    .react-flow__edge-path {
+      stroke-width: 2.5;
+    }
+    .react-flow__edge.animated path {
+      stroke-dasharray: 5;
+      animation: dash 1s linear infinite;
+    }
+
+    @keyframes dash {
+      from {
+        stroke-dashoffset: 10;
+      }
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React code with Babel -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+    const {
+      ReactFlow,
+      MiniMap,
+      Controls,
+      Background,
+      useNodesState,
+      useEdgesState,
+      addEdge,
+      MarkerType,
+    } = window.ReactFlow;
+
+    const BACKEND_URL = "http://localhost:8000";
+
+    // Standard initial node definitions for a fresh workflow
+    const initialNodes = [
+      {
+        id: "node_query",
+        type: "input",
+        data: { label: "📥 Query Input" },
+        position: { x: 50, y: 150 },
+        style: { background: "#1b1e26", color: "#fff", border: "2px solid #2f3542", borderRadius: "8px" }
+      },
+      {
+        id: "node_router",
+        type: "custom",
+        data: { 
+          type: "router", 
+          label: "Router", 
+          config: { routing_mode: "auto" } 
+        },
+        position: { x: 220, y: 150 },
+      },
+      {
+        id: "node_rag",
+        type: "custom",
+        data: { 
+          type: "rag", 
+          label: "RAG Agent", 
+          config: { top_k: 5, filter_docs: "" } 
+        },
+        position: { x: 420, y: 50 },
+      },
+      {
+        id: "node_llm",
+        type: "custom",
+        data: { 
+          type: "llm", 
+          label: "LLM Node", 
+          config: { provider: "gemini", temperature: 0.1, system_prompt: "Answer using the context provided." } 
+        },
+        position: { x: 650, y: 150 },
+      }
+    ];
+
+    const initialEdges = [
+      { id: "e1", source: "node_query", target: "node_router", animated: true },
+      { id: "e2", source: "node_router", target: "node_rag", animated: true },
+      { id: "e3", source: "node_rag", target: "node_llm", animated: true }
+    ];
+
+    // Custom Node Component
+    const CustomNode = ({ data, selected }) => {
+      const getTheme = (type) => {
+        switch (type) {
+          case "router": return { border: "var(--color-router)", icon: "fa-solid fa-route" };
+          case "rag": return { border: "var(--color-rag)", icon: "fa-solid fa-database" };
+          case "memory": return { border: "var(--color-memory)", icon: "fa-solid fa-brain" };
+          case "web_search": return { border: "var(--color-web)", icon: "fa-solid fa-globe" };
+          case "llm": return { border: "var(--color-llm)", icon: "fa-solid fa-microchip" };
+          case "evaluator": return { border: "var(--color-evaluator)", icon: "fa-solid fa-square-poll-vertical" };
+          default: return { border: "var(--border-color)", icon: "fa-solid fa-gear" };
+        }
+      };
+
+      const theme = getTheme(data.type);
+      const isSelected = selected ? "selected" : "";
+
+      const getSubtitle = () => {
+        if (!data.config) return "";
+        if (data.type === "router") return `Mode: ${data.config.routing_mode || "auto"}`;
+        if (data.type === "rag") return `K: ${data.config.top_k || 5}`;
+        if (data.type === "memory") return `K: ${data.config.top_k || 5}`;
+        if (data.type === "web_search") return `Limit: ${data.config.num_results || 3}`;
+        if (data.type === "llm") return `Model: ${data.config.provider || "gemini"}`;
+        if (data.type === "evaluator") return `Criteria: ${(data.config.criteria || []).join(",")}`;
+        return "";
+      };
+
+      return (
+        <div className={`custom-node ${isSelected}`} style={{ borderColor: theme.border }}>
+          {/* Handles (ReactFlow connects handles by default) */}
+          <div className="react-flow__handle react-flow__handle-left" style={{ top: "50%", background: theme.border }} />
+          <div className="react-flow__handle react-flow__handle-right" style={{ top: "50%", background: theme.border }} />
+          
+          <div className="custom-node-header">
+            <i className={theme.icon} style={{ color: theme.border }}></i>
+            <span>{data.label}</span>
+          </div>
+          <div className="custom-node-body">
+            {getSubtitle()}
+          </div>
+          {data.status && (
+            <div className={`custom-node-status status-${data.status}`}>
+              {data.status === "running" && <i className="fa-solid fa-spinner fa-spin"></i>}
+              {data.status === "done" && <i className="fa-solid fa-check"></i>}
+              {data.status === "error" && <i className="fa-solid fa-xmark"></i>}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const nodeTypes = { custom: CustomNode };
+
+    function App() {
+      const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+      const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+      const [selectedNode, setSelectedNode] = useState(null);
+      
+      const [workflowId, setWorkflowId] = useState("");
+      const [workflowName, setWorkflowName] = useState("AI Career RAG Workflow");
+      const [workflowDescription, setWorkflowDescription] = useState("Custom RAG pipeline routing");
+      
+      const [savedWorkflows, setSavedWorkflows] = useState([]);
+      const [executionResult, setExecutionResult] = useState(null);
+      const [executing, setExecuting] = useState(false);
+      const [queryInput, setQueryInput] = useState("What are the main requirements of the Job Description?");
+      const [selectedOutputNodeId, setSelectedOutputNodeId] = useState(null);
+
+      // Fetch Saved Workflows on Mount
+      useEffect(() => {
+        loadWorkflowsList();
+      }, []);
+
+      const loadWorkflowsList = async () => {
+        try {
+          const res = await fetch(`${BACKEND_URL}/workflows`);
+          if (res.ok) {
+            const data = await res.json();
+            setSavedWorkflows(data);
+          }
+        } catch (err) {
+          console.error("Failed to load workflows list", err);
+        }
+      };
+
+      const onConnect = useCallback(
+        (params) => setEdges((eds) => addEdge({ ...params, animated: true }, eds)),
+        [setEdges]
+      );
+
+      // Node Selection
+      const onNodeClick = (event, node) => {
+        setSelectedNode(node);
+      };
+
+      // Add a Node to canvas
+      const addNodeToCanvas = (type) => {
+        const id = `node_${type}_${Date.now().toString().slice(-4)}`;
+        const label = type.replace("_", " ").toUpperCase();
+        
+        // Default configs
+        let config = {};
+        if (type === "router") config = { routing_mode: "auto" };
+        else if (type === "rag") config = { top_k: 5, filter_docs: "" };
+        else if (type === "memory") config = { top_k: 5, memory_types: ["fact", "preference"] };
+        else if (type === "web_search") config = { num_results: 3, search_depth: "basic" };
+        else if (type === "llm") config = { provider: "gemini", temperature: 0.1, system_prompt: "Synthesize answers based on contexts." };
+        else if (type === "evaluator") config = { evaluator_provider: "gemini", criteria: ["faithfulness", "relevance"] };
+
+        const newNode = {
+          id,
+          type: "custom",
+          data: { type, label, config },
+          position: { x: 300, y: 150 },
+        };
+        setNodes((nds) => [...nds, newNode]);
+      };
+
+      // Handle config update
+      const updateNodeConfig = (key, value) => {
+        if (!selectedNode) return;
+        
+        setNodes((nds) =>
+          nds.map((node) => {
+            if (node.id === selectedNode.id) {
+              const updatedConfig = { ...node.data.config, [key]: value };
+              const updatedNode = {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: updatedConfig,
+                },
+              };
+              // Sync local selection
+              setSelectedNode(updatedNode);
+              return updatedNode;
+            }
+            return node;
+          })
+        );
+      };
+
+      // Handle criteria checklist for Evaluator
+      const toggleEvaluatorCriterion = (criterion) => {
+        if (!selectedNode) return;
+        const currentCriteria = selectedNode.data.config.criteria || [];
+        const nextCriteria = currentCriteria.includes(criterion)
+          ? currentCriteria.filter((c) => c !== criterion)
+          : [...currentCriteria, criterion];
+        updateNodeConfig("criteria", nextCriteria);
+      };
+
+      // Handle memory types checklist
+      const toggleMemoryType = (mtype) => {
+        if (!selectedNode) return;
+        const currentTypes = selectedNode.data.config.memory_types || [];
+        const nextTypes = currentTypes.includes(mtype)
+          ? currentTypes.filter((t) => t !== mtype)
+          : [...currentTypes, mtype];
+        updateNodeConfig("memory_types", nextTypes);
+      };
+
+      // Save Workflow
+      const saveWorkflow = async () => {
+        const activeId = workflowId || `flow_${Date.now().toString().slice(-6)}`;
+        if (!workflowId) {
+          setWorkflowId(activeId);
+        }
+
+        // Format to backend definition
+        const formattedNodes = nodes.map(n => ({
+          id: n.id,
+          type: n.data.type || "llm", // Fallback, input nodes don't have types in enum but will map safely
+          label: n.data.label || n.id,
+          position: n.position,
+          config: n.data.config || {},
+        })).filter(n => n.type !== "input" && n.type !== "output"); // Clean up standard IO node helpers if needed
+
+        const formattedEdges = edges.map(e => ({
+          id: e.id,
+          source: e.source,
+          source_handle: e.sourceHandle || null,
+          target: e.target,
+          target_handle: e.targetHandle || null,
+          animated: !!e.animated,
+        }));
+
+        const body = {
+          workflow_id: activeId,
+          name: workflowName,
+          description: workflowDescription,
+          nodes: formattedNodes,
+          edges: formattedEdges,
+        };
+
+        try {
+          const res = await fetch(`${BACKEND_URL}/workflows`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (res.ok) {
+            alert("Workflow saved successfully!");
+            loadWorkflowsList();
+          } else {
+            const err = await res.json();
+            alert(`Error saving workflow: ${err.detail}`);
+          }
+        } catch (err) {
+          alert(`Error saving workflow: ${err}`);
+        }
+      };
+
+      // Load a Workflow
+      const loadWorkflowObj = async (id) => {
+        try {
+          const res = await fetch(`${BACKEND_URL}/workflows/${id}`);
+          if (res.ok) {
+            const data = await res.json();
+            setWorkflowId(data.workflow_id);
+            setWorkflowName(data.name);
+            setWorkflowDescription(data.description || "");
+            
+            // Reconstruct React Flow nodes
+            const reconstructedNodes = [];
+            // Re-add input query node if missing
+            reconstructedNodes.push({
+              id: "node_query",
+              type: "input",
+              data: { label: "📥 Query Input" },
+              position: { x: 50, y: 150 },
+              style: { background: "#1b1e26", color: "#fff", border: "2px solid #2f3542", borderRadius: "8px" }
+            });
+
+            data.nodes.forEach(n => {
+              reconstructedNodes.push({
+                id: n.id,
+                type: "custom",
+                data: {
+                  type: n.type,
+                  label: n.label,
+                  config: n.config,
+                  status: null,
+                },
+                position: n.position,
+              });
+            });
+
+            setNodes(reconstructedNodes);
+            setEdges(data.edges);
+            setExecutionResult(null);
+            setSelectedNode(null);
+          }
+        } catch (err) {
+          alert(`Failed to load workflow: ${err}`);
+        }
+      };
+
+      // Delete Workflow
+      const deleteWorkflow = async () => {
+        if (!workflowId) return alert("No workflow selected to delete.");
+        if (!confirm(`Are you sure you want to delete '${workflowName}'?`)) return;
+
+        try {
+          const res = await fetch(`${BACKEND_URL}/workflows/${workflowId}`, {
+            method: "DELETE"
+          });
+          if (res.ok) {
+            alert("Workflow deleted.");
+            setWorkflowId("");
+            setWorkflowName("New Workflow");
+            setNodes(initialNodes);
+            setEdges(initialEdges);
+            loadWorkflowsList();
+          }
+        } catch (err) {
+          alert(`Failed to delete workflow: ${err}`);
+        }
+      };
+
+      // Execute Workflow
+      const executeWorkflow = async () => {
+        if (!workflowId) {
+          alert("Please save your workflow first before executing.");
+          return;
+        }
+
+        setExecuting(true);
+        setExecutionResult(null);
+        setSelectedOutputNodeId(null);
+
+        // Reset visual status values on nodes
+        setNodes(nds => nds.map(n => ({ ...n, data: { ...n.data, status: null } })));
+
+        try {
+          const res = await fetch(`${BACKEND_URL}/workflows/${workflowId}/execute?query=${encodeURIComponent(queryInput)}`, {
+            method: "POST"
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setExecutionResult(data);
+            
+            // Map step statuses visually to nodes
+            setNodes(nds => nds.map(n => {
+              const step = data.steps.find(s => s.node_id === n.id);
+              if (step) {
+                return { ...n, data: { ...n.data, status: step.status } };
+              }
+              return n;
+            }));
+
+            // Auto select first node with an output to display
+            if (data.steps && data.steps.length > 0) {
+              const completedStep = data.steps.find(s => s.status === "done");
+              if (completedStep) {
+                setSelectedOutputNodeId(completedStep.node_id);
+              }
+            }
+          } else {
+            const err = await res.json();
+            alert(`Execution failed: ${err.detail}`);
+          }
+        } catch (err) {
+          alert(`Execution error: ${err}`);
+        } finally {
+          setExecuting(false);
+        }
+      };
+
+      const selectedOutputContent = () => {
+        if (!executionResult || !selectedOutputNodeId) return "No output loaded.";
+        const step = executionResult.steps.find(s => s.node_id === selectedOutputNodeId);
+        if (!step) return "Step not found.";
+        return JSON.stringify(step.output, null, 2);
+      };
+
+      const renderConfigForm = () => {
+        if (!selectedNode) {
+          return (
+            <div className="empty-state">
+              <i className="fa-solid fa-circle-info"></i>
+              <span>Select a node on the canvas to configure its settings.</span>
+            </div>
+          );
+        }
+
+        const type = selectedNode.data.type;
+        const config = selectedNode.data.config || {};
+
+        if (selectedNode.id === "node_query") {
+          return (
+            <div className="config-panel-body">
+              <h4>Query Input Node</h4>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "6px" }}>
+                This represents the entry point of your workflow. The execution query will be injected here.
+              </p>
+            </div>
+          );
+        }
+
+        return (
+          <div className="config-panel-body">
+            <div className="form-group">
+              <label className="form-label">Node Label</label>
+              <input
+                type="text"
+                className="form-control"
+                value={selectedNode.data.label || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNodes(nds => nds.map(n => n.id === selectedNode.id ? { ...n, data: { ...n.data, label: val } } : n));
+                  setSelectedNode(prev => ({ ...prev, data: { ...prev.data, label: val } }));
+                }}
+              />
+            </div>
+
+            {type === "router" && (
+              <div className="form-group">
+                <label className="form-label">Routing Mode</label>
+                <select
+                  className="form-control"
+                  value={config.routing_mode || "auto"}
+                  onChange={(e) => updateNodeConfig("routing_mode", e.target.value)}
+                >
+                  <option value="auto">Auto-Classify (Semantic)</option>
+                  <option value="rag">Force RAG Agent</option>
+                  <option value="web_search">Force Web Search</option>
+                  <option value="memory">Force Memory Agent</option>
+                  <option value="hybrid">Force Hybrid Pipeline</option>
+                </select>
+              </div>
+            )}
+
+            {type === "rag" && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Retrieve Top K</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    className="form-control"
+                    value={config.top_k || 5}
+                    onChange={(e) => updateNodeConfig("top_k", parseInt(e.target.value) || 5)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Filter Document Name (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Resume.pdf"
+                    className="form-control"
+                    value={config.filter_docs || ""}
+                    onChange={(e) => updateNodeConfig("filter_docs", e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {type === "memory" && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Retrieve Top K</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    className="form-control"
+                    value={config.top_k || 5}
+                    onChange={(e) => updateNodeConfig("top_k", parseInt(e.target.value) || 5)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Memory Types</label>
+                  <div className="checkbox-group">
+                    {["fact", "preference", "summary"].map(mtype => (
+                      <label key={mtype} className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={(config.memory_types || []).includes(mtype)}
+                          onChange={() => toggleMemoryType(mtype)}
+                        />
+                        <span style={{ textTransform: "capitalize" }}>{mtype}s</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {type === "web_search" && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Max Search Results</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    className="form-control"
+                    value={config.num_results || 3}
+                    onChange={(e) => updateNodeConfig("num_results", parseInt(e.target.value) || 3)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Search Depth</label>
+                  <select
+                    className="form-control"
+                    value={config.search_depth || "basic"}
+                    onChange={(e) => updateNodeConfig("search_depth", e.target.value)}
+                  >
+                    <option value="basic">Basic (Fast)</option>
+                    <option value="advanced">Advanced (Deep)</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            {type === "llm" && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">LLM Provider</label>
+                  <select
+                    className="form-control"
+                    value={config.provider || "gemini"}
+                    onChange={(e) => updateNodeConfig("provider", e.target.value)}
+                  >
+                    <option value="gemini">Gemini</option>
+                    <option value="groq">Groq Llama 3</option>
+                    <option value="ollama">Ollama (Local)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Temperature: {config.temperature ?? 0.1}</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    className="form-control"
+                    value={config.temperature ?? 0.1}
+                    onChange={(e) => updateNodeConfig("temperature", parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">System Prompt</label>
+                  <textarea
+                    rows="4"
+                    className="form-control"
+                    style={{ resize: "vertical" }}
+                    value={config.system_prompt || ""}
+                    onChange={(e) => updateNodeConfig("system_prompt", e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {type === "evaluator" && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Evaluator Provider</label>
+                  <select
+                    className="form-control"
+                    value={config.evaluator_provider || "gemini"}
+                    onChange={(e) => updateNodeConfig("evaluator_provider", e.target.value)}
+                  >
+                    <option value="gemini">Gemini</option>
+                    <option value="groq">Groq</option>
+                    <option value="ollama">Ollama</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Evaluation Criteria</label>
+                  <div className="checkbox-group">
+                    {["faithfulness", "relevance", "coherence"].map(crit => (
+                      <label key={crit} className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={(config.criteria || []).includes(crit)}
+                          onChange={() => toggleEvaluatorCriterion(crit)}
+                        />
+                        <span style={{ textTransform: "capitalize" }}>{crit}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <button
+              className="btn btn-danger"
+              style={{ marginTop: "12px", width: "100%", justifyContent: "center" }}
+              onClick={() => {
+                if (selectedNode.id === "node_query") return alert("Cannot delete entrypoint.");
+                setNodes(nds => nds.filter(n => n.id !== selectedNode.id));
+                setEdges(eds => eds.filter(e => e.source !== selectedNode.id && e.target !== selectedNode.id));
+                setSelectedNode(null);
+              }}
+            >
+              <i className="fa-solid fa-trash-can"></i> Delete Node
+            </button>
+          </div>
+        );
+      };
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+          <header>
+            <div className="header-logo">
+              <i className="fa-solid fa-network-wired"></i>
+              <span>Visual Agent Workflow Builder</span>
+            </div>
+            
+            <div className="header-controls">
+              <select
+                className="input-flat"
+                style={{ width: "200px" }}
+                value={workflowId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  if (id) loadWorkflowObj(id);
+                }}
+              >
+                <option value="">-- Load Workflow --</option>
+                {savedWorkflows.map(w => (
+                  <option key={w.workflow_id} value={w.workflow_id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                placeholder="Workflow Name..."
+                className="input-flat"
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+              />
+
+              <button className="btn btn-secondary" onClick={saveWorkflow}>
+                <i className="fa-solid fa-floppy-disk"></i> Save
+              </button>
+
+              <button className="btn btn-danger btn-secondary" onClick={deleteWorkflow} title="Delete Saved Definition">
+                <i className="fa-solid fa-trash"></i>
+              </button>
+
+              <div style={{ width: "1px", height: "24px", backgroundColor: "var(--border-color)" }}></div>
+
+              <input
+                type="text"
+                placeholder="Execution query..."
+                className="input-flat"
+                style={{ width: "320px" }}
+                value={queryInput}
+                onChange={(e) => setQueryInput(e.target.value)}
+              />
+
+              <button className="btn btn-success" onClick={executeWorkflow} disabled={executing}>
+                {executing ? (
+                  <>
+                    <i className="fa-solid fa-spinner fa-spin"></i> Executing...
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-play"></i> Run Flow
+                  </>
+                )}
+              </button>
+            </div>
+          </header>
+
+          <div className="app-container">
+            {/* Left palette */}
+            <div className="sidebar-left">
+              <h3 className="sidebar-section-title">Add Agent Node</h3>
+              <div className="node-palette-list">
+                <div className="palette-item" onClick={() => addNodeToCanvas("router")}>
+                  <div className="palette-item-header">
+                    <span className="badge-dot badge-router"></span>
+                    <span>Router Agent</span>
+                  </div>
+                  <div className="palette-item-desc">Classify intent and select best agent pipelines</div>
+                </div>
+                
+                <div className="palette-item" onClick={() => addNodeToCanvas("rag")}>
+                  <div className="palette-item-header">
+                    <span className="badge-dot badge-rag"></span>
+                    <span>RAG Retriever</span>
+                  </div>
+                  <div className="palette-item-desc">Semantic chunk retrieval from ChromaDB + BM25</div>
+                </div>
+
+                <div className="palette-item" onClick={() => addNodeToCanvas("memory")}>
+                  <div className="palette-item-header">
+                    <span className="badge-dot badge-memory"></span>
+                    <span>Memory Node</span>
+                  </div>
+                  <div className="palette-item-desc">Fetch long-term memory facts and preferences</div>
+                </div>
+
+                <div className="palette-item" onClick={() => addNodeToCanvas("web_search")}>
+                  <div className="palette-item-header">
+                    <span className="badge-dot badge-web"></span>
+                    <span>Web Search</span>
+                  </div>
+                  <div className="palette-item-desc">Real-time search results using Tavily Search API</div>
+                </div>
+
+                <div className="palette-item" onClick={() => addNodeToCanvas("llm")}>
+                  <div className="palette-item-header">
+                    <span className="badge-dot badge-llm"></span>
+                    <span>LLM Node</span>
+                  </div>
+                  <div className="palette-item-desc">Generate final cited content with context block</div>
+                </div>
+
+                <div className="palette-item" onClick={() => addNodeToCanvas("evaluator")}>
+                  <div className="palette-item-header">
+                    <span className="badge-dot badge-evaluator"></span>
+                    <span>Evaluator Node</span>
+                  </div>
+                  <div className="palette-item-desc">Evaluate response quality, relevance, and faithfulness</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Canvas */}
+            <div className="canvas-container">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={onNodeClick}
+                nodeTypes={nodeTypes}
+                fitView
+              >
+                <Controls />
+                <MiniMap style={{ background: "var(--bg-sidebar)" }} nodeColor={(n) => {
+                  if (n.id === "node_query") return "var(--border-color)";
+                  const type = n.data?.type;
+                  if (type === "router") return "var(--color-router)";
+                  if (type === "rag") return "var(--color-rag)";
+                  if (type === "memory") return "var(--color-memory)";
+                  if (type === "web_search") return "var(--color-web)";
+                  if (type === "llm") return "var(--color-llm)";
+                  if (type === "evaluator") return "var(--color-evaluator)";
+                  return "var(--bg-card)";
+                }} />
+                <Background color="#2f3542" gap={16} />
+              </ReactFlow>
+            </div>
+
+            {/* Right Config */}
+            <div className="sidebar-right">
+              <div className="config-panel-header">
+                <h3>Properties</h3>
+                {selectedNode && (
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>ID: {selectedNode.id}</span>
+                )}
+              </div>
+              {renderConfigForm()}
+            </div>
+
+            {/* Execution status footer panel */}
+            {executionResult && (
+              <div className="execution-overlay">
+                <div className="execution-header">
+                  <span>
+                    <i className="fa-solid fa-bolt" style={{ color: "var(--color-evaluator)" }}></i>
+                    &nbsp;Execution Result: {executionResult.status.toUpperCase()} ({executionResult.total_duration_ms}ms)
+                  </span>
+                  <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => setExecutionResult(null)}>
+                    Close
+                  </button>
+                </div>
+                
+                <div className="execution-body">
+                  <div className="execution-steps">
+                    <h4 style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "6px" }}>Node Steps</h4>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", overflowY: "auto" }}>
+                      {executionResult.steps.map(step => (
+                        <div
+                          key={step.node_id}
+                          className={`execution-step-item ${step.status} ${selectedOutputNodeId === step.node_id ? "running" : ""}`}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => setSelectedOutputNodeId(step.node_id)}
+                        >
+                          <span style={{ fontWeight: 500 }}>
+                            {step.status === "done" && <i className="fa-solid fa-circle-check" style={{ color: "var(--color-rag)" }}></i>}
+                            {step.status === "error" && <i className="fa-solid fa-circle-xmark" style={{ color: "#ef4444" }}></i>}
+                            {step.status === "running" && <i className="fa-solid fa-spinner fa-spin" style={{ color: "var(--color-router)" }}></i>}
+                            &nbsp;{step.node_label}
+                          </span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>
+                            {step.duration_ms}ms
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="execution-output-viewer">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <h4 style={{ fontSize: "12px", color: "var(--text-muted)" }}>Outputs for step</h4>
+                      <span style={{ fontSize: "10px", padding: "2px 6px", background: "var(--bg-card)", borderRadius: "4px" }}>
+                        Node ID: {selectedOutputNodeId}
+                      </span>
+                    </div>
+                    <pre className="output-pre">{selectedOutputContent()}</pre>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const container = document.getElementById('root');
+    const root = ReactDOM.createRoot(container);
+    root.render(<App />);
+  </script>
+</body>
+</html>

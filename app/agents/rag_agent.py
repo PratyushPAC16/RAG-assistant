@@ -216,6 +216,7 @@ class RAGAgent:
                         page=chunk.metadata.page,
                         chunk_id=chunk.chunk_id,
                         relevance_score=chunk.rerank_score,
+                        text=chunk.text,
                     )
                 )
         return citations
