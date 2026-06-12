@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 99%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 262.1 83.3% 57.8%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 5.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 263.4 70% 50.4%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 263.4 70% 50.4%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 transition-colors duration-300;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* ── Custom Utilities ────────────────────────────────────────────────────────── */
+
+/* Glassmorphism Styles */
+.glass-panel {
+  @apply bg-white/70 dark:bg-background/60 backdrop-blur-lg border border-black/5 dark:border-white/5 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+}
+
+.glass-card {
+  @apply bg-white/40 dark:bg-zinc-900/40 backdrop-blur-md border border-black/5 dark:border-zinc-800/40 rounded-xl transition-all duration-300 hover:border-primary/30 hover:bg-white/60 dark:hover:bg-zinc-900/60 shadow-sm hover:shadow-md;
+}
+
+.glass-input {
+  @apply bg-white/50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all backdrop-blur-sm;
+}
+
+/* Premium Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/45 transition-colors;
+}
+
+/* Typing Indicator Animation */
+.dot-flashing {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 5px;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+  animation: dot-flashing 1s infinite linear;
+}
+.dot-flashing::before, .dot-flashing::after {
+  content: "";
+  display: inline-block;
+  position: absolute;
+  top: 0;
+}
+.dot-flashing::before {
+  left: -12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 5px;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+  animation: dot-flashing-before 1s infinite linear;
+}
+.dot-flashing::after {
+  left: 12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 5px;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+  animation: dot-flashing-after 1s infinite linear;
+}
+
+@keyframes dot-flashing {
+  0% { background-color: hsl(var(--primary)); }
+  50%, 100% { background-color: rgba(var(--primary), 0.2); }
+}
+@keyframes dot-flashing-before {
+  0% { background-color: rgba(var(--primary), 0.2); }
+  50% { background-color: hsl(var(--primary)); }
+  100% { background-color: rgba(var(--primary), 0.2); }
+}
+@keyframes dot-flashing-after {
+  0%, 50% { background-color: rgba(var(--primary), 0.2); }
+  100% { background-color: hsl(var(--primary)); }
+}
+
+/* Glowing Elements */
+.glow-primary {
+  box-shadow: 0 0 20px 2px rgba(139, 92, 246, 0.15);
+}
+.glow-primary-hover:hover {
+  box-shadow: 0 0 25px 5px rgba(139, 92, 246, 0.25);
+}
+.glow-green {
+  box-shadow: 0 0 20px 2px rgba(16, 185, 129, 0.15);
+}
+.glow-blue {
+  box-shadow: 0 0 20px 2px rgba(59, 130, 246, 0.15);
+}
