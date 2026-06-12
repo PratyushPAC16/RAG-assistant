@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import Markdown from "@/components/chat/Markdown";
 import ObservabilityPanel from "@/components/chat/ObservabilityPanel";
+import SourceCards from "@/components/chat/SourceCards";
 import {
   Plus,
   Trash2,
@@ -41,6 +42,7 @@ export default function ChatPage() {
     currentLatency,
     currentTokens,
     currentDecision,
+    currentSources,
     fetchSessions,
     selectSession,
     deleteSession,
@@ -282,7 +284,20 @@ export default function ChatPage() {
                           {isUser ? (
                             <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                           ) : (
-                            <Markdown content={msg.content} />
+                            <div className="space-y-4">
+                              <Markdown content={msg.content} />
+                              {(() => {
+                                const isLastMessage = idx === messages.length - 1;
+                                const sources = isLastMessage && (isGenerating || isStreaming)
+                                  ? currentSources
+                                  : msg.metadata?.sources || [];
+                                
+                                if (sources && sources.length > 0) {
+                                  return <SourceCards sources={sources} />;
+                                }
+                                return null;
+                              })()}
+                            </div>
                           )}
                         </div>
 
