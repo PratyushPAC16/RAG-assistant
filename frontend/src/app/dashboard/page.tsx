@@ -131,7 +131,7 @@ export default function Dashboard() {
       {/* Title Header */}
       <div className="flex items-center justify-between border-b border-zinc-800/40 pb-5">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-100">RAG Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-100">TalentMind AI Dashboard</h1>
           <p className="text-zinc-400 text-sm mt-1">
             Active telemetry monitors for document parsing, query latency, and pipeline efficiency.
           </p>

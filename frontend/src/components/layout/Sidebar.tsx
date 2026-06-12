@@ -63,14 +63,13 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 bg-zinc-950/80 border-r border-zinc-800/60 flex flex-col h-screen select-none relative backdrop-blur-md">
-      {/* Header Logo */}
       <div className="p-6 border-b border-zinc-800/40 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-md shadow-violet-500/10">
-          <span className="text-zinc-50 font-bold text-xs tracking-wider">RAG</span>
+          <span className="text-zinc-50 font-bold text-xs tracking-widest">TM</span>
         </div>
         <div className="flex flex-col">
-          <span className="font-semibold text-zinc-100 text-sm leading-tight tracking-wide">RAG</span>
-          <span className="text-zinc-500 text-xs tracking-tight">Enterprise Agent</span>
+          <span className="font-semibold text-zinc-100 text-sm leading-tight tracking-wide">TalentMind AI</span>
+          <span className="text-zinc-500 text-[10px] tracking-tight">Enterprise Agent</span>
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
 import { useChatStore } from "@/store/chatStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { Button } from "@/components/ui/Button";
@@ -52,8 +54,26 @@ export default function ChatPage() {
 
   const { useWebSearch, setUseWebSearch, health, fetchHealth } = useSettingsStore();
 
+  // Fetch Documents list to determine status
+  const { data: documentsData } = useQuery({
+    queryKey: ["documents"],
+    queryFn: () => api.listDocuments(),
+    refetchInterval: 8000, // Sync every 8s
+  });
+
+  const documents = documentsData?.documents || [];
+  const indexedDocumentsCount = documents.filter((doc) => doc.status === "indexed").length;
+
   const [input, setInput] = useState("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const examplePrompts = [
+    "Summarize Resume.pdf",
+    "Compare Resume.pdf with JD.pdf",
+    "Extract key skills from uploaded documents",
+    "What requirements are mentioned in the JD?",
+    "Review my resume against the uploaded job description",
+  ];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -219,6 +239,16 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Document Status Indicator */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-zinc-900/40 border border-zinc-850/40 text-xs">
+              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", indexedDocumentsCount > 0 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)] animate-pulse" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]")} />
+              <span className="font-mono text-[10px] text-zinc-400 uppercase tracking-wider">
+                Indexed Documents: <span className="font-bold text-zinc-250 font-sans normal-case text-xs">{indexedDocumentsCount}</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
             {/* Use Web search check */}
             <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer select-none">
               <input
@@ -238,20 +268,115 @@ export default function ChatPage() {
           </div>
         </header>
 
+        {/* Warning Banner when no documents are indexed */}
+        {indexedDocumentsCount === 0 && (
+          <div className="bg-rose-500/5 border-b border-rose-500/15 px-6 py-2.5 flex items-center gap-2.5 text-xs text-rose-450 shrink-0 z-10 select-none">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+            <span>
+              No indexed documents found. Upload files in the{" "}
+              <Link href="/documents" className="underline font-bold hover:text-rose-400 transition-colors">
+                Documents
+              </Link>{" "}
+              section to enable document-based answers.
+            </span>
+          </div>
+        )}
+
         {/* Message bubble stream */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.length === 0 && !isGenerating ? (
-            <div className="h-full flex flex-col justify-center items-center text-center p-6 relative">
+            <div className="min-h-full flex flex-col justify-center items-center text-center p-6 relative py-12">
               {/* Glow background */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-violet-600/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-violet-600/5 rounded-full blur-3xl pointer-events-none" />
               
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/15 mb-4 animate-float">
-                <Sparkles className="w-6 h-6 text-zinc-100" />
-              </div>
-              <h2 className="text-lg font-bold text-zinc-200">How can I assist you today?</h2>
-              <p className="text-zinc-500 text-xs mt-2 max-w-sm leading-relaxed">
-                Scan indexed PDF/Word documents, query local databases, or activate the Web Agent to perform search diagnostics.
-              </p>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4 }}
+                className="flex flex-col items-center max-w-2xl w-full"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/15 mb-4 animate-float">
+                  <Sparkles className="w-6 h-6 text-zinc-100" />
+                </div>
+                <h2 className="text-lg font-bold text-zinc-200">How can I assist you today?</h2>
+                <p className="text-zinc-500 text-xs mt-2 max-w-sm leading-relaxed">
+                  Scan indexed PDF/Word documents, query local databases, or activate the Web Agent to perform search diagnostics.
+                </p>
+
+                {/* Quick Start Guide Onboarding */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15, duration: 0.4 }}
+                  className="w-full mt-8 p-5 rounded-2xl border border-zinc-850/65 bg-zinc-950/20 backdrop-blur-md text-left space-y-4"
+                >
+                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2 select-none">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    Quick Start Guide
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-900/30 border border-zinc-900/50 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step 1</div>
+                        <p className="text-zinc-250 font-semibold mb-1">Upload Files</p>
+                        <p className="text-zinc-500 text-[11px] leading-relaxed">
+                          Go to the registry and upload your PDF, DOCX, or TXT credentials.
+                        </p>
+                      </div>
+                      <Link href="/documents" className="mt-3 block">
+                        <Button variant="outline" className="w-full text-[10px] py-1 h-7 rounded-lg border-zinc-800 hover:bg-zinc-800 text-zinc-350">
+                          Go to Upload
+                        </Button>
+                      </Link>
+                    </div>
+                    
+                    <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-900/30 border border-zinc-900/50">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step 2</div>
+                      <p className="text-zinc-250 font-semibold mb-1">Index Document</p>
+                      <p className="text-zinc-500 text-[11px] leading-relaxed">
+                        Click **Index Document** to trigger the AI semantic chunking and vector parsing pipeline.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-900/30 border border-zinc-900/50">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step 3</div>
+                      <p className="text-zinc-250 font-semibold mb-1">Query Database</p>
+                      <p className="text-zinc-500 text-[11px] leading-relaxed">
+                        Return to the chat interface and run search diagnostics or fit check questions.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Example Prompts */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.4 }}
+                  className="w-full mt-6 text-left"
+                >
+                  <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 select-none">
+                    Suggested Prompts
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 select-none">
+                    {examplePrompts.map((prompt, i) => (
+                      <motion.button
+                        key={i}
+                        whileHover={{ scale: 1.005, translateY: -1.5 }}
+                        whileTap={{ scale: 0.995 }}
+                        onClick={() => {
+                          setInput(prompt);
+                          inputRef.current?.focus();
+                        }}
+                        className="p-3.5 rounded-xl border border-zinc-850/60 bg-zinc-950/20 hover:bg-zinc-900/40 hover:border-zinc-800 transition-all text-left flex items-start gap-2.5 text-xs text-zinc-450 hover:text-zinc-250 group"
+                      >
+                        <span className="text-zinc-500 group-hover:text-primary transition-colors mt-0.5">📄</span>
+                        <span className="leading-relaxed">{prompt}</span>
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+              </motion.div>
             </div>
           ) : (
             <div className="space-y-6 max-w-3xl mx-auto">
@@ -368,29 +493,43 @@ export default function ChatPage() {
 
         {/* Input */}
         <footer className="p-6 shrink-0 bg-gradient-to-t from-zinc-950/80 to-transparent">
-          <form onSubmit={handleSend} className="max-w-3xl mx-auto relative">
-            <textarea
-              ref={inputRef}
-              rows={1}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Query documents database or ask follow-up questions..."
-              disabled={isGenerating || isStreaming}
-              className="w-full bg-zinc-900/60 dark:bg-zinc-950/60 border border-zinc-850/65 focus:border-primary/60 rounded-xl pl-4 pr-16 py-3.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-inner resize-none overflow-hidden max-h-32 text-zinc-200 placeholder-zinc-550 backdrop-blur-md"
-              style={{ height: "auto" }}
-            />
-            
-            <div className="absolute right-3.5 bottom-3.5 flex items-center gap-1.5">
+          <form onSubmit={handleSend} className="max-w-3xl mx-auto relative flex gap-3">
+            <Link href="/documents" className="shrink-0 self-end">
               <Button
-                type="submit"
-                variant="primary"
-                size="icon"
-                disabled={!input.trim() || isGenerating || isStreaming}
-                className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center"
+                type="button"
+                variant="outline"
+                className="h-[46px] rounded-xl border-zinc-850/65 bg-zinc-900/40 text-xs font-semibold hover:bg-zinc-850 hover:text-zinc-250 flex items-center gap-2 px-3.5 shadow-sm"
+                title="Upload and Index Documents"
               >
-                <Send className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4 text-primary" />
+                <span className="hidden sm:inline">Upload Document</span>
               </Button>
+            </Link>
+
+            <div className="flex-1 relative">
+              <textarea
+                ref={inputRef}
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Query documents database or ask follow-up questions..."
+                disabled={isGenerating || isStreaming}
+                className="w-full bg-zinc-900/60 dark:bg-zinc-950/60 border border-zinc-850/65 focus:border-primary/60 rounded-xl pl-4 pr-16 py-3.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-inner resize-none overflow-hidden max-h-32 text-zinc-200 placeholder-zinc-550 backdrop-blur-md"
+                style={{ height: "46px" }}
+              />
+              
+              <div className="absolute right-3.5 bottom-2 flex items-center gap-1.5">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="icon"
+                  disabled={!input.trim() || isGenerating || isStreaming}
+                  className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
           </form>
           <div className="text-center text-[10px] text-zinc-650 mt-2 select-none font-medium">

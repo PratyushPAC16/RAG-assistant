@@ -476,7 +476,7 @@ export default function LandingPage() {
           <div className="space-y-3">
             <h4 className="text-[10px] uppercase font-bold text-zinc-400 tracking-widest font-mono">Telemetry</h4>
             <div className="flex flex-col gap-2 font-mono text-[10px]">
-              <Link href="/dashboard" className="hover:text-zinc-300 transition-colors">RAG Dashboard</Link>
+              <Link href="/dashboard" className="hover:text-zinc-300 transition-colors">TalentMind AI Dashboard</Link>
               <Link href="/analytics" className="hover:text-zinc-300 transition-colors">Extended Analytics</Link>
               <Link href="/benchmarks" className="hover:text-zinc-300 transition-colors">Provider Benchmarks</Link>
               <Link href="/settings" className="hover:text-zinc-300 transition-colors">Backend Settings</Link>

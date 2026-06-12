@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Antigravity RAG | Enterprise AI Agent Assistant",
+  title: "TalentMind AI | Enterprise AI Agent Assistant",
   description: "Advanced Multi-Agent RAG Assistant utilizing Hybrid Search, Cross-Encoders, and LLM orchestration.",
 };
 

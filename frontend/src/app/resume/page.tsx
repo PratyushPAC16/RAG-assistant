@@ -580,7 +580,7 @@ export default function ResumeAnalyzerPage() {
                     <div className="md:col-span-4 bg-zinc-900/25 border border-zinc-900 rounded-lg p-3">
                       <div className="text-[9px] font-mono text-zinc-550 uppercase mb-1">JD Required Threshold</div>
                       <div className="text-zinc-350 text-[11px] leading-relaxed">
-                        {result.jd_requirements?.find((r: string) => r.toLowerCase().includes("degree") || r.toLowerCase().includes("education") || r.toLowerCase().includes("cs") || r.toLowerCase().includes("bachelor") || r.toLowerCase().includes("master")) || "BS/MS in Computer Science or quantitative field equivalent"}
+                        {(Array.isArray(result.jd_requirements) ? result.jd_requirements.find((r: string) => r.toLowerCase().includes("degree") || r.toLowerCase().includes("education") || r.toLowerCase().includes("cs") || r.toLowerCase().includes("bachelor") || r.toLowerCase().includes("master")) : null) || "BS/MS in Computer Science or quantitative field equivalent"}
                       </div>
                     </div>
                   </div>
@@ -603,7 +603,7 @@ export default function ResumeAnalyzerPage() {
                     <div className="md:col-span-4 bg-zinc-900/25 border border-zinc-900 rounded-lg p-3">
                       <div className="text-[9px] font-mono text-zinc-550 uppercase mb-1">JD Required Threshold</div>
                       <div className="text-zinc-350 text-[11px] leading-relaxed">
-                        {result.jd_requirements?.find((r: string) => r.toLowerCase().includes("year") || r.toLowerCase().includes("experience") || r.toLowerCase().includes("work")) || "3+ Years working experience in RAG or Software Development"}
+                        {(Array.isArray(result.jd_requirements) ? result.jd_requirements.find((r: string) => r.toLowerCase().includes("year") || r.toLowerCase().includes("experience") || r.toLowerCase().includes("work")) : null) || "3+ Years working experience in RAG or Software Development"}
                       </div>
                     </div>
                   </div>
@@ -715,7 +715,7 @@ export default function ResumeAnalyzerPage() {
                 </CardHeader>
                 <CardContent className="pt-4 select-text">
                   <ol className="space-y-3.5 text-xs text-zinc-350">
-                    {result.recommendations?.slice(0, 4).map((rec: string, idx: number) => (
+                    {(Array.isArray(result.recommendations) ? result.recommendations : []).slice(0, 4).map((rec: string, idx: number) => (
                       <li key={idx} className="flex items-start gap-2.5 leading-relaxed bg-zinc-900/20 border border-zinc-900 p-2.5 rounded-lg hover:border-zinc-800 transition-colors">
                         <span className="font-mono text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 w-4 h-4 rounded flex items-center justify-center shrink-0 mt-0.5">
                           {idx + 1}
@@ -751,9 +751,9 @@ export default function ResumeAnalyzerPage() {
                         1
                       </span>
                       <div className="space-y-1">
-                        <span className="text-xs font-bold text-zinc-200">Study Core Gaps ({missingSkills.slice(0, 3).join(", ")})</span>
+                        <span className="text-xs font-bold text-zinc-200">Study Core Gaps ({(Array.isArray(missingSkills) ? missingSkills : []).slice(0, 3).join(", ")})</span>
                         <p className="text-[10px] text-zinc-500 leading-relaxed">
-                          Dedicate structured study cycles (e.g. 5-7 hours) to review syntax patterns, architectural limits, and benchmark applications for: <span className="font-mono text-zinc-350 font-semibold">{missingSkills.join(", ")}</span>.
+                          Dedicate structured study cycles (e.g. 5-7 hours) to review syntax patterns, architectural limits, and benchmark applications for: <span className="font-mono text-zinc-350 font-semibold">{(Array.isArray(missingSkills) ? missingSkills : []).join(", ")}</span>.
                         </p>
                       </div>
                     </div>
@@ -792,7 +792,7 @@ export default function ResumeAnalyzerPage() {
                       <div className="space-y-1">
                         <span className="text-xs font-bold text-zinc-200">Qualify JD Requirements Target</span>
                         <p className="text-[10px] text-zinc-500 leading-relaxed">
-                          Validate alignment on target requirements check: <span className="font-mono text-zinc-400 font-semibold">{result.jd_requirements?.slice(0, 3).join(" • ")}</span>. Schedule your mock screen loop.
+                          Validate alignment on target requirements check: <span className="font-mono text-zinc-400 font-semibold">{(Array.isArray(result.jd_requirements) ? result.jd_requirements : []).slice(0, 3).join(" • ")}</span>. Schedule your mock screen loop.
                         </p>
                       </div>
                     </div>
