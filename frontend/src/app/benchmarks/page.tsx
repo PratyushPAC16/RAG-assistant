@@ -23,6 +23,7 @@ import {
   TrendingUp,
   ShieldCheck,
   Zap,
+  X,
 } from "lucide-react";
 import {
   BarChart,
