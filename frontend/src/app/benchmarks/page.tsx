@@ -434,20 +434,20 @@ export default function BenchmarksPage() {
                   <div className="w-full h-[220px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={latencyChartData} margin={{ top: 20, right: 10, left: -25, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
-                        <XAxis dataKey="name" stroke="#55555c" fontSize={9} tickLine={false} />
-                        <YAxis stroke="#55555c" fontSize={9} tickLine={false} unit="s" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#30232E" />
+                        <XAxis dataKey="name" stroke="#858585" fontSize={9} tickLine={false} />
+                        <YAxis stroke="#858585" fontSize={9} tickLine={false} unit="s" />
                         <Tooltip
                           cursor={{ fill: "rgba(255,255,255,0.02)" }}
-                          contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", borderRadius: 8, fontSize: 10, fontFamily: "monospace" }}
+                          contentStyle={{ backgroundColor: "#1A171B", borderColor: "#30232E", borderRadius: 12, fontSize: 10, fontFamily: "monospace" }}
                         />
                         <Bar dataKey="Latency" radius={[4, 4, 0, 0]} barSize={35}>
                           {latencyChartData.map((entry, index) => (
                             <Cell
                               key={`cell-${index}`}
                               fill={
-                                entry.name.toLowerCase() === "gemini" ? "#8b5cf6" :
-                                entry.name.toLowerCase() === "groq" ? "#f97316" : "#10b981"
+                                entry.name.toLowerCase() === "gemini" ? "#D65BB4" :
+                                entry.name.toLowerCase() === "groq" ? "#66415C" : "#ACFF5D"
                               }
                             />
                           ))}
@@ -469,15 +469,15 @@ export default function BenchmarksPage() {
                   <div className="w-full h-[220px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={tokenChartData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
-                        <XAxis dataKey="name" stroke="#55555c" fontSize={9} tickLine={false} />
-                        <YAxis stroke="#55555c" fontSize={9} tickLine={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#30232E" />
+                        <XAxis dataKey="name" stroke="#858585" fontSize={9} tickLine={false} />
+                        <YAxis stroke="#858585" fontSize={9} tickLine={false} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", borderRadius: 8, fontSize: 10, fontFamily: "monospace" }}
+                          contentStyle={{ backgroundColor: "#1A171B", borderColor: "#30232E", borderRadius: 12, fontSize: 10, fontFamily: "monospace" }}
                         />
                         <Legend wrapperStyle={{ fontSize: 9 }} />
-                        <Bar dataKey="Input" stackId="a" fill="#1e3a8a" radius={[0, 0, 0, 0]} barSize={35} />
-                        <Bar dataKey="Output" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={35} />
+                        <Bar dataKey="Input" stackId="a" fill="#66415C" radius={[0, 0, 0, 0]} barSize={35} />
+                        <Bar dataKey="Output" stackId="a" fill="#D65BB4" radius={[4, 4, 0, 0]} barSize={35} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -495,16 +495,16 @@ export default function BenchmarksPage() {
                   <div className="w-full h-[220px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={efficiencyChartData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
-                        <XAxis dataKey="name" stroke="#55555c" fontSize={9} tickLine={false} />
-                        <YAxis yAxisId="left" stroke="#8884d8" fontSize={9} orientation="left" />
-                        <YAxis yAxisId="right" stroke="#82ca9d" fontSize={9} orientation="right" unit="¢" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#30232E" />
+                        <XAxis dataKey="name" stroke="#858585" fontSize={9} tickLine={false} />
+                        <YAxis yAxisId="left" stroke="#D65BB4" fontSize={9} orientation="left" />
+                        <YAxis yAxisId="right" stroke="#ACFF5D" fontSize={9} orientation="right" unit="¢" />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", borderRadius: 8, fontSize: 10, fontFamily: "monospace" }}
+                          contentStyle={{ backgroundColor: "#1A171B", borderColor: "#30232E", borderRadius: 12, fontSize: 10, fontFamily: "monospace" }}
                         />
                         <Legend wrapperStyle={{ fontSize: 9 }} />
-                        <Bar yAxisId="left" dataKey="Quality" fill="#f59e0b" name="Quality Score (0-100)" barSize={20} radius={[4, 4, 0, 0]} />
-                        <Bar yAxisId="right" dataKey="Cost" fill="#10b981" name="Cost per 1K tok (¢)" barSize={20} radius={[4, 4, 0, 0]} />
+                        <Bar yAxisId="left" dataKey="Quality" fill="#D65BB4" name="Quality Score (0-100)" barSize={20} radius={[4, 4, 0, 0]} />
+                        <Bar yAxisId="right" dataKey="Cost" fill="#ACFF5D" name="Cost per 1K tok (¢)" barSize={20} radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -527,16 +527,16 @@ export default function BenchmarksPage() {
                     <div className="w-full h-[220px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={historyTrendData} margin={{ top: 15, right: 20, left: -25, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
-                          <XAxis dataKey="date" stroke="#55555c" fontSize={9} tickLine={false} />
-                          <YAxis stroke="#55555c" fontSize={9} tickLine={false} unit="s" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#30232E" />
+                          <XAxis dataKey="date" stroke="#858585" fontSize={9} tickLine={false} />
+                          <YAxis stroke="#858585" fontSize={9} tickLine={false} unit="s" />
                           <Tooltip
-                            contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", borderRadius: 8, fontSize: 10, fontFamily: "monospace" }}
+                            contentStyle={{ backgroundColor: "#1A171B", borderColor: "#30232E", borderRadius: 12, fontSize: 10, fontFamily: "monospace" }}
                           />
                           <Legend wrapperStyle={{ fontSize: 9 }} />
-                          <Line type="monotone" dataKey="gemini" stroke="#8b5cf6" activeDot={{ r: 5 }} strokeWidth={2} name="Gemini" connectNulls />
-                          <Line type="monotone" dataKey="groq" stroke="#f97316" activeDot={{ r: 5 }} strokeWidth={2} name="Groq" connectNulls />
-                          <Line type="monotone" dataKey="ollama" stroke="#10b981" activeDot={{ r: 5 }} strokeWidth={2} name="Ollama" connectNulls />
+                          <Line type="monotone" dataKey="gemini" stroke="#D65BB4" activeDot={{ r: 5 }} strokeWidth={2} name="Gemini" connectNulls />
+                          <Line type="monotone" dataKey="groq" stroke="#66415C" activeDot={{ r: 5 }} strokeWidth={2} name="Groq" connectNulls />
+                          <Line type="monotone" dataKey="ollama" stroke="#ACFF5D" activeDot={{ r: 5 }} strokeWidth={2} name="Ollama" connectNulls />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -572,8 +572,8 @@ export default function BenchmarksPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{
                           backgroundColor:
-                            p.provider.toLowerCase() === "gemini" ? "#8b5cf6" :
-                            p.provider.toLowerCase() === "groq" ? "#f97316" : "#10b981"
+                            p.provider.toLowerCase() === "gemini" ? "#D65BB4" :
+                            p.provider.toLowerCase() === "groq" ? "#66415C" : "#ACFF5D"
                         }} />
                         <div>
                           <span className="text-xs font-bold text-zinc-250 uppercase tracking-wide">{p.provider}</span>

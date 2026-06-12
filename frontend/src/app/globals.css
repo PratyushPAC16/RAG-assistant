@@ -4,65 +4,65 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 30 6.2% 6.3%;
+    --foreground: 0 0% 100%;
 
-    --card: 0 0% 99%;
-    --card-foreground: 240 10% 3.9%;
+    --card: 285 8% 9.8%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover: 285 8% 9.8%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 316.6 60% 59.8%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 316.2 22.2% 32.7%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 285 8% 9.8%;
+    --muted-foreground: 0 0% 52.2%;
 
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 262.1 83.3% 57.8%;
-
-    --radius: 0.75rem;
-  }
-
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 10% 5.9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 263.4 70% 50.4%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 316.6 60% 59.8%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 263.4 70% 50.4%;
+    --border: 316.2 22.2% 32.7%;
+    --input: 285 8% 9.8%;
+    --ring: 316.6 60% 59.8%;
+
+    --radius: 20px;
+  }
+
+  .dark {
+    --background: 30 6.2% 6.3%;
+    --foreground: 0 0% 100%;
+
+    --card: 285 8% 9.8%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 285 8% 9.8%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 316.6 60% 59.8%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 316.2 22.2% 32.7%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 285 8% 9.8%;
+    --muted-foreground: 0 0% 52.2%;
+
+    --accent: 316.6 60% 59.8%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 316.2 22.2% 32.7%;
+    --input: 285 8% 9.8%;
+    --ring: 316.6 60% 59.8%;
   }
 }
 
@@ -80,15 +80,15 @@
 
 /* Glassmorphism Styles */
 .glass-panel {
-  @apply bg-white/70 dark:bg-background/60 backdrop-blur-lg border border-black/5 dark:border-white/5 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+  @apply bg-[#1A171B]/60 backdrop-blur-xl border border-[#66415C]/25 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)];
 }
 
 .glass-card {
-  @apply bg-white/40 dark:bg-zinc-900/40 backdrop-blur-md border border-black/5 dark:border-zinc-800/40 rounded-xl transition-all duration-300 hover:border-primary/30 hover:bg-white/60 dark:hover:bg-zinc-900/60 shadow-sm hover:shadow-md;
+  @apply bg-[#1A171B]/45 backdrop-blur-xl border border-[#66415C]/20 rounded-[20px] transition-all duration-300 hover:border-[#D65BB4]/35 hover:bg-[#1A171B]/65 shadow-[0_8px_24px_rgba(0,0,0,0.4)] hover:shadow-[0_12px_32px_rgba(214,91,180,0.12)];
 }
 
 .glass-input {
-  @apply bg-white/50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all backdrop-blur-sm;
+  @apply bg-[#1A171B]/70 border border-[#66415C]/35 rounded-xl px-4 py-2 text-sm text-white placeholder-[#858585] focus:outline-none focus:ring-1 focus:ring-[#D65BB4] focus:border-[#D65BB4] transition-all backdrop-blur-md;
 }
 
 /* Premium Scrollbars */
@@ -156,14 +156,14 @@
 
 /* Glowing Elements */
 .glow-primary {
-  box-shadow: 0 0 20px 2px rgba(139, 92, 246, 0.15);
+  box-shadow: 0 0 20px 2px rgba(214, 91, 180, 0.25);
 }
 .glow-primary-hover:hover {
-  box-shadow: 0 0 25px 5px rgba(139, 92, 246, 0.25);
+  box-shadow: 0 0 25px 5px rgba(214, 91, 180, 0.35);
 }
 .glow-green {
-  box-shadow: 0 0 20px 2px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 20px 2px rgba(172, 255, 93, 0.25);
 }
 .glow-blue {
-  box-shadow: 0 0 20px 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 20px 2px rgba(214, 91, 180, 0.20);
 }

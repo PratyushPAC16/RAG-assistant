@@ -394,34 +394,76 @@ Extract the following details and perform a comparison:
 4. Experience history from the resume.
 5. Job Description requirements (skills, experience, education).
 6. Strengths of the candidate relative to the JD.
-7. Missing skills (skills in the JD but missing from the resume).
-8. Recommendations to improve the resume or prepare for the interview.
+7. Weaknesses of the candidate relative to the JD.
+8. Suggestions for improvement to make the resume stand out or prepare for the interview.
 
 Perform scoring:
 - Match Score (0 to 100) based on overall fit.
 - Skill Match % (0 to 100) based on key technologies/skills match.
 - Project Match % (0 to 100) based on relevance of projects.
+- Experience Match % (0 to 100) based on job history alignment.
 - Education Match % (0 to 100) based on degree/major requirements match.
-- Interview Readiness Score (0 to 100) based on seniority and experience fit.
+- Keyword Match % (0 to 100) based on target vocabulary.
+- Formatting Score % (0 to 100) based on resume layout (clarity, section divisions, lack of parsing errors).
+
+Perform missing skills classification:
+- Critical (must-have skills missing in the resume but highly emphasized in the JD).
+- Recommended (should-have skills missing in the resume).
+- Optional (nice-to-have skills missing in the resume).
+
+Perform keyword analysis:
+- Extract top keywords from the JD (minimum 4).
+- Extract top keywords from the Resume (minimum 4).
+- Identify missing keywords (minimum 3).
+- Calculate keyword coverage % (0 to 100).
+
+Perform interview readiness assessment:
+- Calculate an Interview Readiness Score (0 to 100).
+- Assign a status: "Likely Shortlisted" (score 75+), "Borderline" (score 60-74), or "Needs Improvement" (score <60).
+
+CRITICAL GUIDELINES FOR EXTRACTION:
+- You MUST analyze the candidate's actual Resume text and Job Description text. Do NOT use the example values from the JSON template below.
+- "extracted_education": Extract the candidate's actual highest degree(s), school/university, major(s), and graduation year from their Resume (e.g., "B.Tech in Electronics and Communication Engineering from Indian Institute of Information Technology Dharwad (2023 - 2027)"). Do NOT copy "MS in CS from Stanford University". If not found, output "Not specified in resume".
+- "extracted_experience": Extract the candidate's actual professional work history or a summary of their career background from their Resume (e.g., "Intern at X", "Freelance developer", or "No formal experience" if they only have academic projects). Do NOT copy "3 years as a Software Engineer at Google". If not found, output "Not specified in resume".
+- All scores, missing skills, projects, and insights must be derived dynamically from the real input text.
 
 You MUST respond with a single valid JSON object containing the exact keys listed below:
 {
-  "match_score": 85,
-  "skill_match_pct": 80,
-  "project_match_pct": 75,
-  "education_match_pct": 100,
-  "interview_readiness_score": 90,
+  "match_score": 84,
+  "skill_match_pct": 88,
+  "project_match_pct": 82,
+  "experience_match_pct": 79,
+  "education_match_pct": 95,
+  "keyword_match_pct": 76,
+  "formatting_score": 90,
   "extracted_skills": [
     {"name": "Python", "present": true},
-    {"name": "ChromaDB", "present": false}
+    {"name": "LangGraph", "present": false}
   ],
   "extracted_projects": ["Project A: built a RAG app...", "Project B: ..."],
-  "extracted_education": "MS in CS from Stanford University",
-  "extracted_experience": "3 years as a Software Engineer at Google",
+  "extracted_education": "<EXTRACT AND INSERT ACTUAL EDUCATION FROM RESUME TEXT HERE>",
+  "extracted_experience": "<EXTRACT AND INSERT ACTUAL EXPERIENCE/WORK HISTORY FROM RESUME TEXT HERE>",
   "jd_requirements": ["Degree in CS", "Experience with RAG", "Knowledge of ChromaDB"],
-  "strengths": ["Strong Python background", "Relevant RAG projects"],
-  "missing_skills": ["ChromaDB", "LangGraph"],
-  "recommendations": ["Add ChromaDB details to Project A", "Review LangGraph routing concepts"]
+  "missing_skills_categorized": {
+    "critical": ["LangGraph", "Kubernetes"],
+    "recommended": ["CI/CD", "AWS"],
+    "optional": ["Docker", "Git"]
+  },
+  "keyword_analysis": {
+    "top_jd_keywords": [{"text": "Kubernetes", "value": 8}, {"text": "LangGraph", "value": 6}],
+    "top_resume_keywords": [{"text": "Python", "value": 10}, {"text": "RAG", "value": 5}],
+    "missing_keywords": ["Kubernetes", "CI/CD"],
+    "keyword_coverage_pct": 76
+  },
+  "recruiter_insights": {
+    "strengths": ["Strong Python experience", "Relevant AI projects"],
+    "weaknesses": ["Missing deployment experience", "Limited cloud keywords"],
+    "improvement_suggestions": ["Add Kubernetes setup to Project A", "Study LangGraph routing schemas"]
+  },
+  "interview_readiness": {
+    "score": 78,
+    "status": "Likely Shortlisted"
+  }
 }
 
 Respond ONLY with the raw JSON. Do not include markdown code fences, notes, or explanations outside the JSON."""

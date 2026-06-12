@@ -20,9 +20,13 @@ import {
   ChevronRight,
   GraduationCap,
   CheckCircle2,
+  Compass,
+  Check,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { cn } from "@/lib/utils";
 
 export default function LandingPage() {
   const containerVariants = {

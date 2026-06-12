@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 
-const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
+const COLORS = ["#D65BB4", "#66415C", "#ACFF5D", "#FF9F5B", "#E05B5B"];
 
 export default function AnalyticsPage() {
   const { data: analytics, isLoading } = useQuery({
@@ -129,20 +129,20 @@ export default function AnalyticsPage() {
                   <AreaChart data={dailyTrend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorQueries" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#D65BB4" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#D65BB4" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
-                    <XAxis dataKey="date" stroke="#71717a" fontSize={9} />
-                    <YAxis stroke="#71717a" fontSize={9} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#30232E" />
+                    <XAxis dataKey="date" stroke="#858585" fontSize={9} />
+                    <YAxis stroke="#858585" fontSize={9} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", fontSize: 10 }}
+                      contentStyle={{ backgroundColor: "#1A171B", borderColor: "#30232E", borderRadius: 12, fontSize: 10 }}
                     />
                     <Area
                       type="monotone"
                       dataKey="queries"
-                      stroke="#8b5cf6"
+                      stroke="#D65BB4"
                       fillOpacity={1}
                       fill="url(#colorQueries)"
                       name="Queries"
@@ -173,26 +173,26 @@ export default function AnalyticsPage() {
                   <AreaChart data={dailyTrend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorLlm" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#D65BB4" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#D65BB4" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorRet" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#66415C" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#66415C" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
-                    <XAxis dataKey="date" stroke="#71717a" fontSize={9} />
-                    <YAxis stroke="#71717a" fontSize={9} unit="ms" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#30232E" />
+                    <XAxis dataKey="date" stroke="#858585" fontSize={9} />
+                    <YAxis stroke="#858585" fontSize={9} unit="ms" />
                     <Tooltip
-                      contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", fontSize: 10 }}
+                      contentStyle={{ backgroundColor: "#1A171B", borderColor: "#30232E", borderRadius: 12, fontSize: 10 }}
                     />
                     <Legend wrapperStyle={{ fontSize: 10 }} />
                     <Area
                       type="monotone"
                       dataKey="avg_latency"
                       stackId="1"
-                      stroke="#8b5cf6"
+                      stroke="#D65BB4"
                       fill="url(#colorLlm)"
                       name="Overall Latency"
                     />
@@ -233,7 +233,7 @@ export default function AnalyticsPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", fontSize: 10 }}
+                        contentStyle={{ backgroundColor: "#1A171B", borderColor: "#30232E", borderRadius: 12, fontSize: 10 }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -285,7 +285,7 @@ export default function AnalyticsPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", fontSize: 10 }}
+                        contentStyle={{ backgroundColor: "#1A171B", borderColor: "#30232E", borderRadius: 12, fontSize: 10 }}
                       />
                     </PieChart>
                   </ResponsiveContainer>

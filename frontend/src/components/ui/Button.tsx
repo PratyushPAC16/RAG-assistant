@@ -15,34 +15,34 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={loading || props.disabled}
         className={cn(
-          "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 active:scale-98",
+          "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 active:scale-95",
           {
             // default
-            "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-50/90":
+            "bg-[#1A171B] border border-[#66415C]/40 text-white hover:bg-[#1A171B]/80 hover:border-[#D65BB4]/35 hover:shadow-[0_0_15px_rgba(214,91,180,0.08)]":
               variant === "default",
             // primary
-            "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30":
+            "bg-gradient-to-r from-[#D65BB4] to-[#66415C] text-white hover:opacity-95 shadow-[0_4px_20px_rgba(214,91,180,0.22)] hover:shadow-[0_6px_25px_rgba(214,91,180,0.35)] hover:scale-[1.01] border border-[#D65BB4]/20":
               variant === "primary",
             // secondary
-            "bg-secondary text-secondary-foreground hover:bg-secondary/80":
+            "bg-[#66415C]/35 border border-[#66415C]/50 text-zinc-100 hover:bg-[#66415C]/45 hover:text-white":
               variant === "secondary",
             // destructive
-            "bg-destructive text-destructive-foreground hover:bg-destructive/95":
+            "bg-rose-500/80 text-white border border-rose-500/30 hover:bg-rose-600":
               variant === "destructive",
             // outline
-            "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground":
+            "border border-[#66415C]/40 bg-transparent hover:bg-[#66415C]/20 hover:border-[#D65BB4]/30 text-zinc-200 hover:text-white":
               variant === "outline",
             // ghost
-            "hover:bg-accent hover:text-accent-foreground bg-transparent":
+            "hover:bg-[#66415C]/20 hover:text-white bg-transparent text-zinc-300":
               variant === "ghost",
             // link
-            "text-primary underline-offset-4 hover:underline":
+            "text-[#D65BB4] underline-offset-4 hover:underline":
               variant === "link",
           },
           {
             "h-9 px-4 py-2": size === "default",
-            "h-8 rounded-md px-3 text-xs": size === "sm",
-            "h-10 rounded-md px-8": size === "lg",
+            "h-8 rounded-lg px-3 text-xs": size === "sm",
+            "h-10 rounded-[14px] px-8": size === "lg",
             "h-9 w-9 p-0": size === "icon",
           },
           className
