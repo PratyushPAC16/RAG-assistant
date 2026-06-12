@@ -52,6 +52,7 @@ export default function Sidebar() {
     { name: "Documents", href: "/documents", icon: Files },
     { name: "Resume Analyzer", href: "/resume", icon: FileUser },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    { name: "Benchmarks", href: "/benchmarks", icon: Activity },
     { name: "Architecture", href: "/workflow", icon: Cpu },
     { name: "Settings", href: "/settings", icon: Settings },
   ];
