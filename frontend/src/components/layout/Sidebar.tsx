@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Sun,
   Moon,
+  Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/store/settingsStore";

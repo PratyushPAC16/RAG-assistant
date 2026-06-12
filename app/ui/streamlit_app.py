@@ -44,49 +44,49 @@ def inject_custom_styles() -> None:
     if theme == "dark":
         css_vars = """
         :root {
-            --bg-main: #080b11;
-            --bg-card: rgba(255, 255, 255, 0.04);
-            --bg-sidebar: rgba(8, 11, 17, 0.6);
-            --bg-navbar: rgba(8, 11, 17, 0.75);
-            --bg-input: rgba(255, 255, 255, 0.06);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
-            --shadow-main: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            --primary: #3b82f6;
-            --primary-hover: #60a5fa;
-            --hr-color: rgba(255, 255, 255, 0.08);
-            --glass-blur: blur(20px) saturate(120%);
-            --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+            --bg-main: #060713;
+            --bg-card: rgba(18, 21, 46, 0.45);
+            --bg-sidebar: rgba(11, 13, 30, 0.65);
+            --bg-navbar: rgba(6, 7, 19, 0.75);
+            --bg-input: rgba(255, 255, 255, 0.04);
+            --border-color: rgba(99, 102, 241, 0.16);
+            --text-main: #f1f3f9;
+            --text-muted: #9fa8c7;
+            --shadow-main: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            --primary: #8b5cf6; /* Electric Violet */
+            --primary-hover: #a78bfa;
+            --hr-color: rgba(99, 102, 241, 0.1);
+            --glass-blur: blur(20px) saturate(140%);
+            --glass-border: 1px solid rgba(99, 102, 241, 0.15);
             --nav-item-bg: rgba(255, 255, 255, 0.01);
-            --nav-border: rgba(255, 255, 255, 0.04);
-            --nav-hover-bg: rgba(255, 255, 255, 0.05);
-            --nav-active-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(167, 139, 250, 0.18));
-            --nav-active-border: rgba(99, 102, 241, 0.4);
+            --nav-border: rgba(99, 102, 241, 0.08);
+            --nav-hover-bg: rgba(99, 102, 241, 0.05);
+            --nav-active-bg: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(236, 72, 153, 0.12));
+            --nav-active-border: rgba(139, 92, 246, 0.45);
         }
         """
     else:
         css_vars = """
         :root {
-            --bg-main: #f4f6fa;
-            --bg-card: rgba(255, 255, 255, 0.45);
-            --bg-sidebar: rgba(244, 246, 250, 0.6);
-            --bg-navbar: rgba(244, 246, 250, 0.75);
-            --bg-input: rgba(0, 0, 0, 0.04);
-            --border-color: rgba(0, 0, 0, 0.06);
-            --text-main: #111827;
-            --text-muted: #4b5563;
-            --shadow-main: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --hr-color: rgba(0, 0, 0, 0.06);
-            --glass-blur: blur(20px) saturate(120%);
-            --glass-border: 1px solid rgba(0, 0, 0, 0.06);
+            --bg-main: #f8fafc;
+            --bg-card: rgba(255, 255, 255, 0.75);
+            --bg-sidebar: rgba(241, 245, 249, 0.75);
+            --bg-navbar: rgba(248, 250, 252, 0.85);
+            --bg-input: rgba(0, 0, 0, 0.03);
+            --border-color: rgba(99, 102, 241, 0.08);
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --shadow-main: 0 8px 32px 0 rgba(99, 102, 241, 0.04);
+            --primary: #6366f1; /* Indigo */
+            --primary-hover: #4f46e5;
+            --hr-color: rgba(99, 102, 241, 0.06);
+            --glass-blur: blur(20px) saturate(140%);
+            --glass-border: 1px solid rgba(99, 102, 241, 0.08);
             --nav-item-bg: rgba(0, 0, 0, 0.005);
-            --nav-border: rgba(0, 0, 0, 0.04);
-            --nav-hover-bg: rgba(0, 0, 0, 0.03);
-            --nav-active-bg: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(124, 58, 237, 0.08));
-            --nav-active-border: rgba(124, 58, 237, 0.25);
+            --nav-border: rgba(0, 0, 0, 0.03);
+            --nav-hover-bg: rgba(99, 102, 241, 0.03);
+            --nav-active-bg: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(236, 72, 153, 0.05));
+            --nav-active-border: rgba(99, 102, 241, 0.25);
         }
         """
         
@@ -106,9 +106,9 @@ def inject_custom_styles() -> None:
             
             .stApp {{
                 background: {
-                    "radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%), var(--bg-main)"
+                    "radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.12) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(20, 184, 166, 0.12) 0px, transparent 50%), var(--bg-main)"
                     if theme == "dark" else
-                    "radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.08) 0px, transparent 50%), var(--bg-main)"
+                    "radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.06) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.06) 0px, transparent 50%), var(--bg-main)"
                 } !important;
             }}
             
@@ -288,7 +288,7 @@ def inject_custom_styles() -> None:
                 font-family: 'Space Grotesk', sans-serif;
                 font-size: 1.25rem;
                 font-weight: 700;
-                background: linear-gradient(135deg, #3b82f6, #a78bfa);
+                background: linear-gradient(135deg, var(--primary), #d946ef);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 letter-spacing: 0.5px;
@@ -896,7 +896,7 @@ def inject_custom_styles() -> None:
                 font-weight: 800;
                 line-height: 1.1;
                 letter-spacing: -1.5px;
-                background: linear-gradient(135deg, #3b82f6 0%, #a855f7 50%, #ec4899 100%);
+                background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #14b8a6 100%);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 margin-bottom: 0.75rem;

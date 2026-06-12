@@ -21,21 +21,22 @@
 
   <style>
     :root {
-      --bg-main: #0e1117;
-      --bg-sidebar: #161920;
-      --bg-card: #21242d;
-      --bg-input: #1b1e26;
-      --text-main: #f0f2f6;
-      --text-muted: #8a99ad;
-      --border-color: #2f3542;
-      --primary: #4a6fa5;
+      --bg-main: #060713;
+      --bg-sidebar: #0b0d1e;
+      --bg-card: rgba(18, 21, 46, 0.7);
+      --bg-input: rgba(255, 255, 255, 0.03);
+      --text-main: #f1f3f9;
+      --text-muted: #9fa8c7;
+      --border-color: rgba(99, 102, 241, 0.16);
+      --primary: #8b5cf6; /* Electric Violet */
+      --primary-glow: rgba(139, 92, 246, 0.35);
       
-      --color-router: #3b82f6;
-      --color-rag: #10b981;
-      --color-memory: #8b5cf6;
-      --color-web: #f97316;
-      --color-llm: #ec4899;
-      --color-evaluator: #eab308;
+      --color-router: #6366f1; /* Deep Indigo */
+      --color-rag: #14b8a6; /* Aurora Teal */
+      --color-memory: #ec4899; /* Sunset Pink */
+      --color-web: #f43f5e; /* Cyberpunk Rose */
+      --color-llm: #a855f7; /* Royal Purple */
+      --color-evaluator: #06b6d4; /* Electric Cyan */
       
       --font-family: 'Outfit', sans-serif;
     }
@@ -49,6 +50,9 @@
     body {
       font-family: var(--font-family);
       background-color: var(--bg-main);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%), 
+        radial-gradient(at 100% 100%, rgba(20, 184, 166, 0.08) 0px, transparent 50%);
       color: var(--text-main);
       height: 100vh;
       overflow: hidden;
@@ -103,23 +107,26 @@
     }
 
     .btn {
-      background-color: var(--primary);
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
       color: #fff;
       border: none;
       padding: 8px 16px;
       border-radius: 6px;
       font-family: var(--font-family);
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      transition: background-color 0.2s, transform 0.1s;
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .btn:hover {
-      background-color: #5a7fb5;
+      background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+      box-shadow: 0 6px 16px rgba(139, 92, 246, 0.35);
+      transform: translateY(-1px);
     }
 
     .btn:active {
@@ -130,24 +137,30 @@
       background-color: transparent;
       border: 1px solid var(--border-color);
       color: var(--text-main);
+      box-shadow: none;
     }
 
     .btn-secondary:hover {
-      background-color: rgba(255, 255, 255, 0.05);
+      background-color: rgba(99, 102, 241, 0.08);
+      border-color: var(--primary);
     }
 
     .btn-success {
-      background-color: var(--color-rag);
+      background: linear-gradient(135deg, var(--color-rag), #0d9488);
+      box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
     }
     .btn-success:hover {
-      background-color: #059669;
+      background: linear-gradient(135deg, #2dd4bf, #14b8a6);
+      box-shadow: 0 6px 16px rgba(20, 184, 166, 0.35);
     }
 
     .btn-danger {
-      background-color: #ef4444;
+      background: linear-gradient(135deg, #ef4444, #be123c);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
     }
     .btn-danger:hover {
-      background-color: #dc2626;
+      background: linear-gradient(135deg, #f87171, #ef4444);
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.35);
     }
 
     .app-container {
@@ -193,12 +206,13 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      transition: border-color 0.2s, transform 0.1s;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .palette-item:hover {
-      border-color: rgba(255, 255, 255, 0.15);
+      border-color: var(--primary);
       transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(139, 92, 246, 0.12);
     }
 
     .palette-item-header {
@@ -309,18 +323,27 @@
     /* Custom Node styling */
     .custom-node {
       padding: 12px;
-      border-radius: 8px;
+      border-radius: 10px;
       background-color: var(--bg-card);
+      backdrop-filter: blur(10px);
       border: 2px solid var(--border-color);
       color: var(--text-main);
       min-width: 170px;
       font-family: var(--font-family);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
       position: relative;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .custom-node:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px 0 rgba(139, 92, 246, 0.15);
+      border-color: rgba(99, 102, 241, 0.4);
     }
 
     .custom-node.selected {
       border-color: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
     }
 
     .custom-node-header {
@@ -517,7 +540,7 @@
         type: "input",
         data: { label: "📥 Query Input" },
         position: { x: 50, y: 150 },
-        style: { background: "#1b1e26", color: "#fff", border: "2px solid #2f3542", borderRadius: "8px" }
+        style: { background: "var(--bg-card)", color: "var(--text-main)", border: "2px solid var(--border-color)", borderRadius: "10px", boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.3)" }
       },
       {
         id: "node_router",
@@ -789,7 +812,7 @@
               type: "input",
               data: { label: "📥 Query Input" },
               position: { x: 50, y: 150 },
-              style: { background: "#1b1e26", color: "#fff", border: "2px solid #2f3542", borderRadius: "8px" }
+              style: { background: "var(--bg-card)", color: "var(--text-main)", border: "2px solid var(--border-color)", borderRadius: "10px", boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.3)" }
             });
 
             data.nodes.forEach(n => {
@@ -1268,7 +1291,7 @@
                   if (type === "evaluator") return "var(--color-evaluator)";
                   return "var(--bg-card)";
                 }} />
-                <Background color="#2f3542" gap={16} />
+                <Background color="rgba(99, 102, 241, 0.12)" gap={16} />
               </ReactFlow>
             </div>
 

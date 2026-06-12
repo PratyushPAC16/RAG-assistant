@@ -14,8 +14,9 @@ import {
   Layers,
   Search,
   CheckCircle2,
+  Info,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface ArchitectureNode {
@@ -25,97 +26,114 @@ interface ArchitectureNode {
   icon: any;
   color: string;
   details: string[];
+  timingMetric: string;
+  schemaSample: string;
 }
 
 const nodes: ArchitectureNode[] = [
   {
     id: "query",
     title: "User Query",
-    description: "Accepts search query and filters.",
+    description: "Captures user query prompts and filters.",
     icon: Sparkles,
-    color: "text-zinc-400 border-zinc-800/40 bg-zinc-950/40 hover:border-zinc-700/60",
+    color: "text-zinc-400 border-zinc-800 bg-zinc-950/45",
+    timingMetric: "Latency: <1ms",
     details: [
-      "Performs client-side request stripping",
-      "Injects conversation Session UUID",
-      "Appends optional file filter scopes",
+      "Formats query input string lengths",
+      "Injects session context trackers",
+      "Enforces string limit constraints",
     ],
+    schemaSample: "{\n  \"query\": \"RAG performance parameters\",\n  \"session_id\": \"sess_5a1f22\"\n}",
   },
   {
     id: "router",
     title: "Router Node",
-    description: "Evaluates intent and routes traffic.",
+    description: "Evaluates semantic intent to route traffic.",
     icon: Compass,
-    color: "text-blue-400 border-blue-500/20 bg-blue-500/5 hover:border-blue-500/40",
+    color: "text-blue-400 border-blue-500/20 bg-blue-500/5",
+    timingMetric: "Latency: ~120ms",
     details: [
-      "Uses prompt templates for zero-shot routing",
-      "Supports RAG, Web Search, or Memory agents",
-      "Applies rule-based overrides on empty documents",
+      "Performs LLM-based zero-shot classifications",
+      "Routes to RAG, Web Search, or Memory managers",
+      "Falls back to local documents database on fail",
     ],
+    schemaSample: "{\n  \"agent\": \"rag\",\n  \"confidence\": 0.96,\n  \"reasoning\": \"Queries local docs\"\n}",
   },
   {
     id: "agent",
-    title: "Agent (LangGraph)",
-    description: "Drives conversational state machine.",
+    title: "Agent Controller",
+    description: "Coordinates state machine execution loops.",
     icon: Cpu,
-    color: "text-purple-400 border-purple-500/20 bg-purple-500/5 hover:border-purple-500/40",
+    color: "text-purple-400 border-purple-500/20 bg-purple-500/5",
+    timingMetric: "Latency: ~50ms",
     details: [
-      "Manages StateGraph contextual dictionaries",
-      "Controls recursive execution checks",
-      "Decides when to synthesise or fetch memory",
+      "Tracks contextual graph memory arrays",
+      "Saves loop executions traces",
+      "Coordinates document extraction sequences",
     ],
+    schemaSample: "{\n  \"agent_state\": \"running\",\n  \"trace\": [\"init\", \"route_rag\"]\n}",
   },
   {
     id: "retrieval",
-    title: "Hybrid Retrieval",
-    description: "Queries vector and keyword indexes.",
+    title: "Hybrid Search",
+    description: "Combines keyword and semantic retrievals.",
     icon: Search,
-    color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5 hover:border-cyan-500/40",
+    color: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5",
+    timingMetric: "Latency: ~180ms",
     details: [
-      "Queries ChromaDB using Gemini Embeddings",
-      "Runs local BM25 okapi keyword scoring",
-      "Fuses scores via Reciprocal Rank Fusion (RRF)",
+      "Runs cosine similarity search on ChromaDB",
+      "Executes local BM25 okapi search",
+      "Combines ranks using Reciprocal Rank Fusion (RRF)",
     ],
+    schemaSample: "{\n  \"vector_hits\": 20,\n  \"bm25_hits\": 20,\n  \"rrf_fused\": 5\n}",
   },
   {
     id: "reranker",
-    title: "Reranker Node",
-    description: "Refines chunk relevance scores.",
+    title: "Cross-Reranker",
+    description: "Optimizes matching chunks relevance.",
     icon: Layers,
-    color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/5 hover:border-indigo-500/40",
+    color: "text-indigo-400 border-indigo-500/20 bg-indigo-500/5",
+    timingMetric: "Latency: ~85ms",
     details: [
       "Uses cross-encoder/ms-marco-MiniLM model",
-      "Filters out low-score noisy context chunks",
-      "Saves top 5 most-relevant chunks",
+      "Discards low-probability noisy elements",
+      "Delivers top 5 chunks for LLM contexts",
     ],
+    schemaSample: "{\n  \"top_chunk_id\": \"chk_2a8\",\n  \"rerank_score\": 0.941\n}",
   },
   {
     id: "provider",
-    title: "Provider Layer",
-    description: "Invokes selected LLM runtime engine.",
+    title: "Provider Engine",
+    description: "Translates contexts into prompt answers.",
     icon: Database,
-    color: "text-amber-400 border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40",
+    color: "text-amber-400 border-amber-500/20 bg-amber-500/5",
+    timingMetric: "Latency: ~1200ms",
     details: [
-      "Connects to Gemini Cloud or Groq APIs",
-      "Queries Ollama local models (e.g. Llama 3.2)",
-      "Monitors token lengths and pricing estimates",
+      "Triggers Ollama, Groq, or Gemini dynamically",
+      "Tracks generated cost parameters",
+      "Counts inputs and outputs tokens",
     ],
+    schemaSample: "{\n  \"provider\": \"gemini\",\n  \"total_tokens\": 762,\n  \"cost\": 0.00014\n}",
   },
   {
     id: "response",
-    title: "Response Output",
-    description: "Compiles cited Markdown markdown answers.",
+    title: "Response compiler",
+    description: "Prepares citation cards and markdown.",
     icon: CheckCircle2,
-    color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40",
+    color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5",
+    timingMetric: "Latency: <1ms",
     details: [
-      "Renders markdown syntax tables and lists",
-      "Injects clickable document citations",
-      "Updates conversation persistence managers",
+      "Renders clickable page citation lists",
+      "Persists conversation turn on disk databases",
+      "Closes execution loop metrics tracking",
     ],
+    schemaSample: "{\n  \"answer\": \"Semantic RAG uses...\",\n  \"citations\": [\"report.pdf\"]\n}",
   },
 ];
 
 export default function ArchitecturePage() {
   const [selectedNode, setSelectedNode] = useState<ArchitectureNode>(nodes[0]);
+  const [hoveredNode, setHoveredNode] = useState<ArchitectureNode | null>(null);
   const [activeStep, setActiveStep] = useState<number | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
 
@@ -136,8 +154,10 @@ export default function ArchitecturePage() {
         setIsSimulating(false);
         setActiveStep(null);
       }
-    }, 1500);
+    }, 1200);
   };
+
+  const nodeToShow = hoveredNode || selectedNode;
 
   return (
     <div className="flex-1 overflow-y-auto p-8 space-y-8">
@@ -149,7 +169,7 @@ export default function ArchitecturePage() {
             System Architecture
           </h1>
           <p className="text-zinc-400 text-sm mt-1">
-            Visual pipeline representation. Track how User Queries flow through routing classifiers, hybrid search engines, and cross-encoders.
+            Visual pipeline trace diagram showing semantic routing, hybrid indexing, and cross-encoder structures.
           </p>
         </div>
         <Button
@@ -157,34 +177,46 @@ export default function ArchitecturePage() {
           disabled={isSimulating}
           variant="primary"
           size="sm"
-          className="flex items-center gap-1.5"
+          className="flex items-center gap-1.5 font-semibold"
         >
           <Play className="w-4 h-4 fill-current" />
-          Simulate Execution
+          Trace Pipeline
         </Button>
       </div>
 
-      {/* Visual Pipeline Loop - Horizontal on desktop, grid on mobile */}
+      {/* Visual Pipeline map */}
       <div className="p-8 rounded-2xl bg-zinc-950/30 border border-zinc-900 overflow-x-auto select-none relative backdrop-blur-md">
-        {/* Glow path overlay */}
-        <div className="hidden lg:block absolute left-14 right-14 top-1/2 -translate-y-1/2 h-0.5 bg-zinc-850" />
+        {/* Glow pipeline line */}
+        <div className="hidden lg:block absolute left-14 right-14 top-1/2 -translate-y-1/2 h-0.5 bg-zinc-850">
+          {isSimulating && activeStep !== null && (
+            <motion.div
+              className="absolute left-0 h-0.5 bg-primary rounded-full shadow-[0_0_8px_rgba(139,92,246,0.5)]"
+              initial={{ width: "0%" }}
+              animate={{ width: `${(activeStep / (nodes.length - 1)) * 100}%` }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+            />
+          )}
+        </div>
         
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10 min-w-[900px] lg:min-w-0">
           {nodes.map((node, index) => {
             const Icon = node.icon;
             const isSelected = selectedNode.id === node.id;
+            const isHovered = hoveredNode?.id === node.id;
             const isActiveSimNode = activeStep === index;
 
             return (
               <React.Fragment key={node.id}>
-                {/* Node Box */}
+                {/* Node Box card */}
                 <motion.div
+                  onHoverStart={() => setHoveredNode(node)}
+                  onHoverEnd={() => setHoveredNode(null)}
                   onClick={() => setSelectedNode(node)}
                   animate={isActiveSimNode ? { scale: 1.05 } : { scale: 1 }}
                   className={cn(
                     "w-36 p-4 rounded-xl border flex flex-col items-center text-center cursor-pointer transition-all duration-300 relative",
                     node.color,
-                    isSelected
+                    isSelected || isHovered
                       ? "ring-1 ring-primary border-primary bg-zinc-900/60 shadow-[0_0_20px_0_rgba(139,92,246,0.15)]"
                       : "bg-zinc-950/40 hover:bg-zinc-900/20"
                   )}
@@ -196,7 +228,7 @@ export default function ArchitecturePage() {
                   
                   {isActiveSimNode && (
                     <span className="absolute -top-2 bg-primary text-primary-foreground px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider animate-bounce">
-                      Active
+                      Running
                     </span>
                   )}
                 </motion.div>
@@ -205,8 +237,8 @@ export default function ArchitecturePage() {
                 {index < nodes.length - 1 && (
                   <ArrowRight
                     className={cn(
-                      "w-4 h-4 text-zinc-700 hidden lg:block shrink-0 transition-colors duration-300",
-                      activeStep !== null && activeStep >= index && "text-primary animate-pulse"
+                      "w-4 h-4 text-zinc-750 hidden lg:block shrink-0 transition-colors duration-300",
+                      activeStep !== null && activeStep >= index ? "text-primary animate-pulse" : "text-zinc-800"
                     )}
                   />
                 )}
@@ -216,32 +248,37 @@ export default function ArchitecturePage() {
         </div>
       </div>
 
-      {/* Component Details Block */}
+      {/* Node explanation details */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Component explanation */}
+        {/* Core responsibilities */}
         <Card className="lg:col-span-2 glass-panel border-zinc-800/40">
           <CardHeader className="border-b border-zinc-800/20">
-            <CardTitle className="text-md font-semibold text-zinc-100 flex items-center gap-2">
-              <span className="p-1.5 bg-primary/10 border border-primary/20 rounded-lg text-primary">
-                {React.createElement(selectedNode.icon, { className: "w-4.5 h-4.5" })}
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-md font-semibold text-zinc-100 flex items-center gap-2">
+                <span className="p-1.5 bg-primary/10 border border-primary/20 rounded-lg text-primary">
+                  {React.createElement(nodeToShow.icon, { className: "w-4.5 h-4.5" })}
+                </span>
+                {nodeToShow.title} Component
+              </CardTitle>
+              <span className="font-mono text-[10px] bg-zinc-900 px-2.5 py-1 rounded text-zinc-400 border border-zinc-850/50">
+                {nodeToShow.timingMetric}
               </span>
-              {selectedNode.title} Node
-            </CardTitle>
-            <CardDescription className="text-zinc-500 text-xs">
-              {selectedNode.description}
+            </div>
+            <CardDescription className="text-zinc-550 text-xs">
+              {nodeToShow.description}
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-5 space-y-4">
-            <h4 className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+          <CardContent className="pt-5 space-y-5">
+            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
               Functional Responsibilities
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {selectedNode.details.map((detail, idx) => (
+            </span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {nodeToShow.details.map((detail, idx) => (
                 <div
                   key={idx}
-                  className="p-3.5 rounded-lg bg-zinc-900/20 border border-zinc-800/30 text-xs text-zinc-300 leading-relaxed flex items-start gap-2"
+                  className="p-3.5 rounded-lg bg-zinc-900/20 border border-zinc-800/30 text-xs text-zinc-300 leading-relaxed flex flex-col gap-1.5"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1.5" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                   <span>{detail}</span>
                 </div>
               ))}
@@ -249,33 +286,19 @@ export default function ArchitecturePage() {
           </CardContent>
         </Card>
 
-        {/* Observability Details Guide */}
+        {/* Schema representation */}
         <Card className="glass-panel border-zinc-800/40">
           <CardHeader className="border-b border-zinc-800/20">
-            <CardTitle className="text-md font-semibold text-zinc-100 flex items-center gap-1.5">
-              <HelpCircle className="w-5 h-5 text-cyan-400" /> System Guide
+            <CardTitle className="text-sm font-semibold text-zinc-100 flex items-center gap-1.5">
+              <Info className="w-4.5 h-4.5 text-cyan-400" /> DTO Schema Structure
             </CardTitle>
             <CardDescription className="text-zinc-500 text-xs">
-              Understanding state pipelines.
+              Pydantic JSON schema sample.
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-5 space-y-4 text-xs leading-relaxed text-zinc-400">
-            <p>
-              Our multi-agent assistant leverages a State Graph Orchestrator pattern. Each card represents a dedicated stage execution thread in the backend.
-            </p>
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Router: Zero-shot classification</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-500" />
-                <span>Retrieval: ChromaDB vector match + BM25 keyword</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                <span>Reranker: Cross-Encoder score optimization</span>
-              </div>
+          <CardContent className="pt-5">
+            <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-850/40 font-mono text-[10px] text-zinc-400 leading-relaxed overflow-x-auto whitespace-pre">
+              {nodeToShow.schemaSample}
             </div>
           </CardContent>
         </Card>

@@ -18,7 +18,7 @@ import {
   FileCode,
   HardDrive,
 } from "lucide-react";
-import { formatBytes, formatDateTime } from "@/lib/utils";
+import { cn, formatBytes, formatDateTime } from "@/lib/utils";
 
 export default function DocumentsPage() {
   const queryClient = useQueryClient();
