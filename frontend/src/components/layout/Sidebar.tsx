@@ -47,7 +47,7 @@ export default function Sidebar() {
   };
 
   const navItems = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "AI Chat", href: "/chat", icon: MessageSquare },
     { name: "Documents", href: "/documents", icon: Files },
     { name: "Resume Analyzer", href: "/resume", icon: FileUser },
@@ -58,6 +58,8 @@ export default function Sidebar() {
   ];
 
   const isHealthy = health?.status === "healthy";
+
+  if (pathname === "/") return null;
 
   return (
     <aside className="w-64 bg-zinc-950/80 border-r border-zinc-800/60 flex flex-col h-screen select-none relative backdrop-blur-md">
