@@ -145,13 +145,6 @@ class RAGAgent:
 
         return state
 
-                        relevance_score=chunk.rerank_score,
-                        text=chunk.text,
-                    )
-                )
-        return citations
-
-
 # ── Module-level singleton ─────────────────────────────────────────────────────
 
 _rag_agent: RAGAgent | None = None

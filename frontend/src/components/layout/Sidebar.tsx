@@ -107,10 +107,10 @@ export default function Sidebar() {
             </span>
           </div>
           <button
-            onClick={() => reloadBackend()}
+            onClick={() => isHealthy ? reloadBackend() : fetchHealth()}
             disabled={isLoading}
-            className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-50"
-            title="Reload Config & Services"
+            className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-350 transition-colors disabled:opacity-50"
+            title={isHealthy ? "Reload Config & Services" : "Retry Connection"}
           >
             <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
           </button>

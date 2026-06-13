@@ -28,6 +28,7 @@ import {
   HelpCircle,
   Activity,
   History,
+  Coins,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -84,7 +85,9 @@ export default function ChatPage() {
   }, [fetchSessions, fetchHealth]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0 || isGenerating) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, isGenerating]);
 
   const handleSend = async (e: React.FormEvent) => {
@@ -315,7 +318,7 @@ export default function ChatPage() {
                     Quick Start Guide
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                    <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-900/30 border border-zinc-900/50 flex flex-col justify-between">
+                    <div className="space-y-2.5 p-4 rounded-xl bg-zinc-900/35 border border-zinc-900/60 flex flex-col justify-between backdrop-blur-sm">
                       <div>
                         <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step 1</div>
                         <p className="text-zinc-250 font-semibold mb-1">Upload Files</p>
@@ -324,26 +327,44 @@ export default function ChatPage() {
                         </p>
                       </div>
                       <Link href="/documents" className="mt-3 block">
-                        <Button variant="outline" className="w-full text-[10px] py-1 h-7 rounded-lg border-zinc-800 hover:bg-zinc-800 text-zinc-350">
+                        <Button variant="outline" className="w-full text-[10px] py-1 h-7.5 rounded-lg border-zinc-800 hover:bg-zinc-800 text-zinc-350 transition-colors">
                           Go to Upload
                         </Button>
                       </Link>
                     </div>
                     
-                    <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-900/30 border border-zinc-900/50">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step 2</div>
-                      <p className="text-zinc-250 font-semibold mb-1">Index Document</p>
-                      <p className="text-zinc-500 text-[11px] leading-relaxed">
-                        Click **Index Document** to trigger the AI semantic chunking and vector parsing pipeline.
-                      </p>
+                    <div className="space-y-2.5 p-4 rounded-xl bg-zinc-900/35 border border-zinc-900/60 flex flex-col justify-between backdrop-blur-sm">
+                      <div>
+                        <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step 2</div>
+                        <p className="text-zinc-250 font-semibold mb-1">Index Document</p>
+                        <p className="text-zinc-500 text-[11px] leading-relaxed">
+                          Click **Index Document** to trigger the AI semantic chunking and vector parsing pipeline.
+                        </p>
+                      </div>
+                      <Link href="/documents" className="mt-3 block">
+                        <Button variant="outline" className="w-full text-[10px] py-1 h-7.5 rounded-lg border-zinc-800 hover:bg-zinc-800 text-zinc-350 transition-colors">
+                          Go to Index
+                        </Button>
+                      </Link>
                     </div>
                     
-                    <div className="space-y-1.5 p-3.5 rounded-xl bg-zinc-900/30 border border-zinc-900/50">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step 3</div>
-                      <p className="text-zinc-250 font-semibold mb-1">Query Database</p>
-                      <p className="text-zinc-500 text-[11px] leading-relaxed">
-                        Return to the chat interface and run search diagnostics or fit check questions.
-                      </p>
+                    <div className="space-y-2.5 p-4 rounded-xl bg-zinc-900/35 border border-zinc-900/60 flex flex-col justify-between backdrop-blur-sm">
+                      <div>
+                        <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Step 3</div>
+                        <p className="text-zinc-250 font-semibold mb-1">Query Database</p>
+                        <p className="text-zinc-500 text-[11px] leading-relaxed">
+                          Return to the chat interface and run search diagnostics or fit check questions.
+                        </p>
+                      </div>
+                      <div className="mt-3">
+                        <Button 
+                          onClick={() => inputRef.current?.focus()} 
+                          variant="outline" 
+                          className="w-full text-[10px] py-1 h-7.5 rounded-lg border-zinc-800 hover:bg-zinc-800 text-zinc-350 transition-colors"
+                        >
+                          Focus Chat Input
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -368,9 +389,9 @@ export default function ChatPage() {
                           setInput(prompt);
                           inputRef.current?.focus();
                         }}
-                        className="p-3.5 rounded-xl border border-zinc-850/60 bg-zinc-950/20 hover:bg-zinc-900/40 hover:border-zinc-800 transition-all text-left flex items-start gap-2.5 text-xs text-zinc-450 hover:text-zinc-250 group"
+                        className="p-3.5 rounded-xl border border-zinc-850/60 bg-zinc-950/20 hover:bg-zinc-900/40 hover:border-zinc-800 transition-all text-left flex items-start gap-2.5 text-xs text-zinc-450 hover:text-zinc-250 group glass-panel"
                       >
-                        <span className="text-zinc-500 group-hover:text-primary transition-colors mt-0.5">📄</span>
+                        <MessageSquare className="w-3.5 h-3.5 text-zinc-650 group-hover:text-primary transition-colors mt-0.5 shrink-0" />
                         <span className="leading-relaxed">{prompt}</span>
                       </motion.button>
                     ))}
@@ -515,7 +536,7 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="Query documents database or ask follow-up questions..."
                 disabled={isGenerating || isStreaming}
-                className="w-full bg-zinc-900/60 dark:bg-zinc-950/60 border border-zinc-850/65 focus:border-primary/60 rounded-xl pl-4 pr-16 py-3.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-inner resize-none overflow-hidden max-h-32 text-zinc-200 placeholder-zinc-550 backdrop-blur-md"
+                className="w-full bg-zinc-900/60 dark:bg-zinc-950/60 border border-zinc-850/65 focus:border-primary/60 rounded-xl pl-4 pr-16 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-inner resize-none overflow-hidden max-h-32 text-zinc-200 placeholder-zinc-550 backdrop-blur-md"
                 style={{ height: "46px" }}
               />
               
