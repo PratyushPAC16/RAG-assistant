@@ -56,11 +56,11 @@ RUN mkdir -p /app/data /app/chroma_db /app/logs \
 USER raguser
 
 # Expose ports
-EXPOSE 8000 8501
+EXPOSE 8000
 
 # Health check for the FastAPI server
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Default: run FastAPI (overridden by docker-compose for Streamlit)
+# Default: run FastAPI
 CMD ["python", "-m", "uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

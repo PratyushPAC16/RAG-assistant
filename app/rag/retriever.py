@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import math
 import statistics
+import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -212,7 +213,7 @@ class HybridRetriever:
 
         if fused:
             result.rrf_score_dist = _compute_score_distribution(
-                [c.semantic_score for c in fused if c.semantic_score is not None]
+                [rrf_scores[c.chunk_id] for c in fused if c.chunk_id in rrf_scores]
             )
 
         # ── Stage 4: Slice to top-K ────────────────────────────────────────────
@@ -415,13 +416,15 @@ class HybridRetriever:
 # ── Module-level singleton ─────────────────────────────────────────────────────
 
 _retriever: HybridRetriever | None = None
+_retriever_lock = threading.Lock()
 
 
 def get_retriever() -> HybridRetriever:
     """
-    Return the singleton :class:`HybridRetriever` instance.
+    Return the singleton :class:`HybridRetriever` instance (thread-safe).
     """
     global _retriever
-    if _retriever is None:
-        _retriever = HybridRetriever()
+    with _retriever_lock:
+        if _retriever is None:
+            _retriever = HybridRetriever()
     return _retriever

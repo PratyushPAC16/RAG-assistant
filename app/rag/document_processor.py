@@ -250,9 +250,6 @@ class DocumentProcessor:
         all_docs: list[Document] = []
         all_metas: list[ChunkMetadata] = []
         global_index = 0
-        total_chunks_estimate = sum(
-            max(1, len(text) // settings.chunk_size) for _, text in pages
-        )
 
         for page_num, page_text in pages:
             if not page_text.strip():
@@ -271,7 +268,7 @@ class DocumentProcessor:
                     file_type=file_type,
                     chunk_id=cid,
                     document_id=document_id,
-                    total_chunks=total_chunks_estimate,
+                    total_chunks=0,  # placeholder; patched below
                 )
                 doc = Document(
                     page_content=chunk_text,
@@ -280,6 +277,14 @@ class DocumentProcessor:
                 all_docs.append(doc)
                 all_metas.append(meta)
                 global_index += 1
+
+        # Patch total_chunks with the actual count now that splitting is done
+        actual_total = len(all_metas)
+        for meta in all_metas:
+            meta.total_chunks = actual_total
+            # Also patch into the parallel Document metadata dict
+        for doc, meta in zip(all_docs, all_metas):
+            doc.metadata["total_chunks"] = actual_total
 
         return all_docs, all_metas
 

@@ -16,7 +16,6 @@ langchain-groq==0.2.4
 
 # ── Vector Databases ─────────────────────────────────────────
 chromadb==1.0.9
-faiss-cpu==1.9.0.post1
 
 # ── Document Processing ──────────────────────────────────────
 pypdf==5.5.0
@@ -41,12 +40,6 @@ uvicorn[standard]==0.34.2
 python-multipart==0.0.20
 httpx==0.28.1
 
-# ── UI Framework ─────────────────────────────────────────────
-streamlit==1.45.1
-streamlit-chat==0.1.1
-plotly==6.1.1
-pandas==2.2.3
-
 # ── Pydantic ─────────────────────────────────────────────────
 pydantic==2.11.5
 pydantic-settings==2.9.1
@@ -55,6 +48,7 @@ pydantic-settings==2.9.1
 python-dotenv==1.1.0
 tenacity==9.1.2
 aiofiles==24.1.0
+slowapi==0.1.9
 
 # ── Testing ──────────────────────────────────────────────────
 pytest==8.3.5

@@ -7,12 +7,14 @@ and conversation memory to generate a cohesive answer with source citations.
 from __future__ import annotations
 
 import re
+import threading
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.models.schemas import AgentState, RetrievedChunk, SourceCitation
 from app.utils.config import get_settings
+from app.utils.cost import calculate_cost, extract_token_usage
 from app.utils.llm_factory import get_llm
 from app.utils.logger import get_logger, log_latency
 
@@ -130,8 +132,6 @@ class ResponseSynthesizer:
             with log_latency(logger, "synthesis_llm_generation") as llm_ctx:
                 response = self._llm.invoke(messages)
                 answer = response.content
-                
-                from app.utils.llm_factory import extract_token_usage, calculate_cost
                 p_tok, c_tok, t_tok = extract_token_usage(response)
                 state.prompt_tokens += p_tok
                 state.completion_tokens += c_tok
@@ -242,11 +242,13 @@ class ResponseSynthesizer:
 # ── Module-level singleton ─────────────────────────────────────────────────────
 
 _synthesizer: ResponseSynthesizer | None = None
+_synthesizer_lock = threading.Lock()
 
 
 def get_synthesizer() -> ResponseSynthesizer:
-    """Return the singleton ResponseSynthesizer instance."""
+    """Return the singleton ResponseSynthesizer instance (thread-safe)."""
     global _synthesizer
-    if _synthesizer is None:
-        _synthesizer = ResponseSynthesizer()
+    with _synthesizer_lock:
+        if _synthesizer is None:
+            _synthesizer = ResponseSynthesizer()
     return _synthesizer

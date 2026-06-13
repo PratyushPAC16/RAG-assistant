@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.models.schemas import AgentState, AgentType, RoutingDecision
 from app.rag.vector_store import VectorStore, get_vector_store
 from app.utils.config import get_settings
+from app.utils.cost import calculate_cost, extract_token_usage
 from app.utils.logger import get_logger, log_latency
 from app.utils.llm_factory import get_llm
 
@@ -128,7 +130,6 @@ class RouterAgent:
             state.prompt_tokens += p_tok
             state.completion_tokens += c_tok
             state.total_tokens += t_tok
-            from app.utils.llm_factory import calculate_cost
             state.cost_usd += calculate_cost(p_tok, c_tok)
 
             state.agent_type = agent_type
@@ -230,7 +231,6 @@ class RouterAgent:
 
         try:
             response = self._llm.invoke(messages)
-            from app.utils.llm_factory import extract_token_usage
             p_tok, c_tok, t_tok = extract_token_usage(response)
             agent_type, decision = self._parse_routing_response_with_decision(
                 response.content, num_docs, query, has_history
@@ -250,19 +250,6 @@ class RouterAgent:
                 num_docs_available=num_docs,
             )
             return agent_type, decision, 0, 0, 0
-
-    def _classify(
-        self,
-        query: str,
-        num_docs: int,
-        has_history: bool,
-        history_preview: str,
-    ) -> AgentType:
-        """Convenience wrapper — returns only AgentType (backwards compat)."""
-        agent_type, _ = self._classify_with_decision(
-            query, num_docs, has_history, history_preview
-        )
-        return agent_type
 
     def _parse_routing_response_with_decision(
         self, raw: str, num_docs: int, query: str = "", has_history: bool = False
@@ -321,10 +308,6 @@ class RouterAgent:
             )
             return agent_type, decision
 
-    def _parse_routing_response(self, raw: str, num_docs: int) -> AgentType:
-        """Backwards-compatible wrapper — returns only AgentType."""
-        agent_type, _ = self._parse_routing_response_with_decision(raw, num_docs)
-        return agent_type
 
     @staticmethod
     def _fallback_route(query: str, num_docs: int, has_history: bool) -> AgentType:
@@ -360,11 +343,13 @@ class RouterAgent:
 # ── Module-level singleton ─────────────────────────────────────────────────────
 
 _router: RouterAgent | None = None
+_router_lock = threading.Lock()
 
 
 def get_router() -> RouterAgent:
-    """Return the singleton RouterAgent instance."""
+    """Return the singleton RouterAgent instance (thread-safe)."""
     global _router
-    if _router is None:
-        _router = RouterAgent()
+    with _router_lock:
+        if _router is None:
+            _router = RouterAgent()
     return _router

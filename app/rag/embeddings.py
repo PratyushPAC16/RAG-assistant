@@ -149,7 +149,7 @@ class EmbeddingService:
         Async wrapper around :meth:`embed_documents`.
         Runs the synchronous call in a thread pool to avoid blocking.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.embed_documents, texts)
 
     async def aembed_query(self, text: str) -> list[float]:
@@ -157,7 +157,7 @@ class EmbeddingService:
         Async wrapper around :meth:`embed_query`.
         Runs the synchronous call in a thread pool to avoid blocking.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.embed_query, text)
 
     def get_langchain_embeddings(self) -> Embeddings:
@@ -196,7 +196,10 @@ class EmbeddingService:
 
 # ── Module-level singleton ─────────────────────────────────────────────────────
 
+import threading
+
 _embedding_service: EmbeddingService | None = None
+_embedding_service_lock = threading.Lock()
 
 
 def get_embedding_service() -> EmbeddingService:
@@ -205,6 +208,7 @@ def get_embedding_service() -> EmbeddingService:
     Created on first call; subsequent calls reuse the same instance.
     """
     global _embedding_service
-    if _embedding_service is None:
-        _embedding_service = EmbeddingService()
+    with _embedding_service_lock:
+        if _embedding_service is None:
+            _embedding_service = EmbeddingService()
     return _embedding_service

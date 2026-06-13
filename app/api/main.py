@@ -8,6 +8,7 @@ from __future__ import annotations
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -44,7 +45,7 @@ from app.models.schemas import (
     WorkflowExecutionResult,
 )
 from app.rag.document_processor import DocumentProcessor
-from app.rag.retriever import get_retriever
+from app.rag.retriever import _compute_score_distribution, get_retriever
 from app.rag.vector_store import VectorStore, get_vector_store
 from app.utils.config import get_settings
 from app.utils.logger import configure_logging, get_logger, set_request_id
@@ -79,7 +80,7 @@ def _load_benchmark_history() -> list[BenchmarkRun]:
                     if stripped:
                         runs.append(BenchmarkRun.model_validate_json(stripped))
         except Exception as exc:
-            logger.error(f"Failed to load benchmark history: {exc}", exc_info=True)
+            logger.error("Failed to load benchmark history", extra={"error": str(exc)}, exc_info=True)
     return runs
 
 def _persist_benchmark_run(run: BenchmarkRun) -> None:
@@ -88,7 +89,7 @@ def _persist_benchmark_run(run: BenchmarkRun) -> None:
         with open(BENCHMARK_FILE, "a", encoding="utf-8") as f:
             f.write(run.model_dump_json() + "\n")
     except Exception as exc:
-        logger.error(f"Failed to persist benchmark run: {exc}", exc_info=True)
+        logger.error("Failed to persist benchmark run", extra={"error": str(exc)}, exc_info=True)
 
 def _load_persisted_metrics() -> list[RetrievalMetric]:
     metrics = []
@@ -99,9 +100,12 @@ def _load_persisted_metrics() -> list[RetrievalMetric]:
                     stripped = line.strip()
                     if stripped:
                         metrics.append(RetrievalMetric.model_validate_json(stripped))
-            logger.info(f"Loaded {len(metrics)} persisted metrics from {METRICS_FILE}")
+            logger.info(
+                "Persisted metrics loaded",
+                extra={"count": len(metrics), "file": str(METRICS_FILE)},
+            )
         except Exception as exc:
-            logger.error(f"Failed to load persisted metrics: {exc}", exc_info=True)
+            logger.error("Failed to load persisted metrics", extra={"error": str(exc)}, exc_info=True)
     return metrics
 
 def _persist_metric(metric: RetrievalMetric) -> None:
@@ -111,7 +115,7 @@ def _persist_metric(metric: RetrievalMetric) -> None:
         with open(METRICS_FILE, "a", encoding="utf-8") as f:
             f.write(metric.model_dump_json() + "\n")
     except Exception as exc:
-        logger.error(f"Failed to persist metric: {exc}", exc_info=True)
+        logger.error("Failed to persist metric", extra={"error": str(exc)}, exc_info=True)
 
 
 def _rebuild_document_registry() -> None:
@@ -131,7 +135,6 @@ def _rebuild_document_registry() -> None:
                 doc_chunks[doc_id].append(meta)
                 
         # Rebuild records
-        from datetime import datetime
         for doc_id, chunks in doc_chunks.items():
             rep = chunks[0]
             filename = rep.get("document_name") or rep.get("source") or "unknown"
@@ -165,14 +168,21 @@ def _rebuild_document_registry() -> None:
                 num_chunks=len(chunks),
                 num_pages=num_pages,
                 file_size_bytes=file_size,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
-        logger.info(f"Rebuilt document registry with {len(_document_registry)} documents from ChromaDB")
+        logger.info(
+            "Document registry rebuilt",
+            extra={"count": len(_document_registry)},
+        )
     except Exception as exc:
-        logger.error(f"Failed to rebuild document registry from ChromaDB: {exc}", exc_info=True)
+        logger.error(
+            "Failed to rebuild document registry",
+            extra={"error": str(exc)},
+            exc_info=True,
+        )
 
 
-# ── Application lifespan ───────────────────────────────────────────────────────
+# ── Application lifespan ─────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -204,19 +214,41 @@ app = FastAPI(
         "Multi-agent Retrieval-Augmented Generation platform. "
         "Upload documents, chat with your knowledge base, and get cited answers."
     ),
-    version="1.0.0",
+    version=settings.api_version,
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
 )
 
+_cors_origins = (
+    [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+    if settings.allowed_origins != "*"
+    else ["*"]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten for production
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Rate limiting ──────────────────────────────────────────────────────────────
+
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+
+    _limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+    app.state.limiter = _limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    _RATE_LIMITING_ENABLED = True
+    logger.info("Rate limiting enabled via slowapi")
+except ImportError:
+    _RATE_LIMITING_ENABLED = False
+    logger.warning("slowapi not installed — rate limiting disabled.")
 
 
 # ── Middleware: request-ID injection ───────────────────────────────────────────
@@ -264,7 +296,7 @@ async def health_check() -> HealthResponse:
 
     return HealthResponse(
         status="healthy",
-        version="1.0.0",
+        version=settings.api_version,
         vector_store="chromadb",
         embedding_model=active_emb,
         llm_model=active_llm,
@@ -309,13 +341,42 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
         filename=filename,
         file_type=FileType(extension),
         status=DocumentStatus.PROCESSING,
-        file_size_bytes=0,
+                file_size_bytes=0,
     )
     _document_registry[document_id] = record
 
     try:
-        # ── Save uploaded file ─────────────────────────────────────────────────
+        # ── Save uploaded file ──────────────────────────────────────────────
         content = await file.read()
+
+        # ── File size limit ─────────────────────────────────────────────────
+        max_bytes = settings.max_upload_size_mb * 1024 * 1024
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File too large. Maximum allowed size is {settings.max_upload_size_mb} MB.",
+            )
+
+        # ── MIME-type validation ──────────────────────────────────────────────
+        try:
+            import magic
+            detected_mime = magic.from_buffer(content[:2048], mime=True)
+            _ALLOWED_MIMES = {
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "text/plain",
+            }
+            if detected_mime not in _ALLOWED_MIMES:
+                raise HTTPException(
+                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                    detail=(
+                        f"Detected MIME type '{detected_mime}' is not allowed. "
+                        f"Allowed types: PDF, DOCX, TXT."
+                    ),
+                )
+        except ImportError:
+            # python-magic not available; fall back to extension-only check
+            logger.warning("python-magic not available; skipping MIME-type validation")
         async with aiofiles.open(save_path, "wb") as f:
             await f.write(content)
         record.file_size_bytes = len(content)
@@ -339,13 +400,13 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
         retriever.refresh_bm25_index()
 
         # ── Update registry ────────────────────────────────────────────────────
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         num_pages = max((m.page or 1) for m in chunk_metas) if chunk_metas else None
         record.status = DocumentStatus.INDEXED
         record.num_chunks = len(documents)
         record.num_pages = num_pages
-        record.indexed_at = datetime.utcnow()
+        record.indexed_at = datetime.now(timezone.utc)
 
         logger.info(
             "Document indexed",
@@ -539,7 +600,7 @@ async def analyze_resume(
         return analysis_result
 
     except Exception as exc:
-        logger.error(f"Resume analysis failed: {exc}", exc_info=True)
+        logger.error("Resume analysis failed", extra={"error": str(exc)}, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Resume analysis comparison failed: {exc}"
@@ -594,21 +655,6 @@ async def chat(request: ChatRequest) -> ChatResponse:
             c.semantic_score for c in result.retrieved_chunks if c.semantic_score is not None
         ]
 
-        def _score_dist(scores: list[float]) -> ScoreDistribution:
-            if not scores:
-                return ScoreDistribution()
-            import math, statistics as _st
-            s = sorted(scores)
-            n = len(s)
-            p90_idx = max(0, int(math.ceil(0.9 * n)) - 1)
-            return ScoreDistribution(
-                min_score=round(s[0], 6),
-                max_score=round(s[-1], 6),
-                mean_score=round(_st.mean(s), 6),
-                p50_score=round(_st.median(s), 6),
-                p90_score=round(s[p90_idx], 6),
-            )
-
         metric = RetrievalMetric(
             query=request.query,
             query_length=len(request.query),
@@ -628,8 +674,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
             llm_latency_ms=lms.get("synthesis_llm") or lms.get("llm"),
             total_latency_ms=total_ms,
             # score distributions
-            rerank_score_distribution=_score_dist(rerank_scores),
-            rrf_score_distribution=_score_dist(rrf_scores),
+            rerank_score_distribution=_compute_score_distribution(rerank_scores),
+            rrf_score_distribution=_compute_score_distribution(rrf_scores),
             # sources
             sources_used=[s.document for s in result.sources],
             top_reranked_sources=[
@@ -847,9 +893,16 @@ async def delete_document(document_id: str) -> DeleteDocumentResponse:
         for save_path in settings.data_path.glob(f"{document_id}_*"):
             save_path.unlink()
 
-        # Rebuild BM25 index after deletion
+        # Rebuild BM25 index after deletion (non-fatal if it fails)
         retriever = get_retriever()
-        retriever.refresh_bm25_index()
+        try:
+            retriever.refresh_bm25_index()
+        except Exception as bm25_exc:
+            logger.error(
+                "BM25 index refresh failed after document deletion",
+                extra={"document_id": document_id, "error": str(bm25_exc)},
+                exc_info=True,
+            )
 
         # Remove from registry
         del _document_registry[document_id]
@@ -923,12 +976,12 @@ async def reindex_document(document_id: str) -> UploadResponse:
         retriever.refresh_bm25_index()
 
         # Update registry record
-        from datetime import datetime
+        from datetime import datetime, timezone
         num_pages = max((m.page or 1) for m in chunk_metas) if chunk_metas else None
         record.status = DocumentStatus.INDEXED
         record.num_chunks = len(documents)
         record.num_pages = num_pages
-        record.indexed_at = datetime.utcnow()
+        record.indexed_at = datetime.now(timezone.utc)
 
         logger.info(
             "Document reindexed",
@@ -1453,7 +1506,7 @@ async def run_benchmark(
 
     # ── 3. Concurrent invocation via asyncio ──────────────────────────────────
     async def call_provider(provider: str, model: str) -> BenchmarkProviderResult:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         try:
             llm = await loop.run_in_executor(
                 None, lambda: get_provider_llm(provider, temperature=temperature)
@@ -1511,7 +1564,7 @@ async def run_benchmark(
             res.retrieval_accuracy = 0.0
             res.evaluation_reasoning = "Provider returned an error — faithfulness N/A."
             return
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         try:
             eval_llm = await loop.run_in_executor(
                 None, lambda: get_provider_llm(cfg.llm_provider.lower(), temperature=0.0)
@@ -1616,12 +1669,15 @@ WORKFLOWS_DIR.mkdir(parents=True, exist_ok=True)
 async def save_workflow(workflow: WorkflowDefinition) -> dict:
     """Save a workflow definition to disk as a JSON file."""
     try:
-        from datetime import datetime
-        workflow.updated_at = datetime.utcnow()
+        from datetime import datetime, timezone
+        workflow.updated_at = datetime.now(timezone.utc)
         filepath = WORKFLOWS_DIR / f"{workflow.workflow_id}.json"
         async with aiofiles.open(filepath, "w", encoding="utf-8") as f:
             await f.write(workflow.model_dump_json(indent=2))
-        logger.info(f"Saved workflow '{workflow.name}' ({workflow.workflow_id})")
+        logger.info(
+            "Workflow saved",
+            extra={"name": workflow.name, "workflow_id": workflow.workflow_id},
+        )
         return {"status": "saved", "workflow_id": workflow.workflow_id}
     except Exception as exc:
         raise HTTPException(
@@ -1732,7 +1788,7 @@ async def execute_workflow_route(workflow_id: str, query: str) -> dict:
 
     # Execute workflow synchronously in an executor thread
     import asyncio
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     try:
         result = await loop.run_in_executor(
             None, lambda: execute_workflow(workflow, query)

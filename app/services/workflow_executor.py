@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from app.models.schemas import (
@@ -345,7 +345,7 @@ def execute_workflow(workflow: WorkflowDefinition, query: str) -> WorkflowExecut
 
     result.status            = "done" if all(s.status == "done" for s in result.steps) else "error"
     result.total_duration_ms = round((time.perf_counter() - overall_start) * 1000, 2)
-    result.completed_at      = datetime.utcnow()
+    result.completed_at      = datetime.now(timezone.utc)
     result.final_output      = {
         "response":         ctx.get("response", ""),
         "context":          ctx.get("context", ""),

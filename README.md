@@ -8,7 +8,6 @@
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?style=for-the-badge&logo=tailwindcss)
 ![LangGraph](https://img.shields.io/badge/LangGraph-0.4-FF6B35?style=for-the-badge)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.45-FF4B4B?style=for-the-badge&logo=streamlit)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-1.0-4A90D9?style=for-the-badge)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
 
@@ -23,13 +22,13 @@ Upload documents → Ask questions → Get cited answers from a fleet of intelli
 ## Architecture
 
 ```
-┌──────────────────────────────────────┐     ┌──────────────────────────────────────┐
-│       Next.js Frontend (Port 3000)   │     │      Streamlit Frontend (Port 8501)  │
-│ Dashboard │ Chat │ Workflows │ ATS   │     │  Dashboard │ Chat (Cites) │ Analytics │
-└──────────────────┬───────────────────┘     └──────────────────┬───────────────────┘
-                   │ HTTP                                       │ HTTP
-                   └─────────────────────┬──────────────────────┘
-                                         ▼
+┌──────────────────────────────────────┐
+│       Next.js Frontend (Port 3000)   │
+│ Dashboard │ Chat │ Workflows │ ATS   │
+└──────────────────┬───────────────────┘
+                   │
+                   │ HTTP Requests
+                   ▼
 ┌───────────────────────────────────────────────────────────────────────────────────┐
 │                            FastAPI Backend (Port 8000)                            │
 │   /chat   │   /upload   │   /documents   │   /health   │   /analytics   │   /reload   │
@@ -89,7 +88,6 @@ RAG Agent Ingestion Pipeline:
 | Feature | Implementation |
 |---|---|
 | **Next.js UI Portal** | Modern TypeScript React interface with glassmorphic styling, Lucide icons, and Montserrat typography |
-| **Streamlit UI Portal** | Companion dashboard, agent node playback visualizer, and Plotly analytics graphs |
 | **Career ATS Analyzer** | PDF Resume vs. Job Description (JD) comparison with match scores, skill gap analysis, and prep recommendations |
 | **Visual Workflow Builder** | Dynamic custom DAG pipelines built via React Flow (nodes: router, rag, memory, web_search, llm, evaluator) |
 | **Multi-Provider Benchmarks** | Concurrent prompt execution on Ollama, Groq, and Gemini, assessing speed, cost, and LLM-graded faithfulness |
@@ -105,7 +103,7 @@ RAG Agent Ingestion Pipeline:
 
 ## Quick Start
 
-### Option 1: Docker (FastAPI & Streamlit UI)
+### Option 1: Docker (FastAPI Backend)
 
 ```bash
 # 1. Clone and enter directory
@@ -115,15 +113,14 @@ git clone <repo> && cd enterprise-rag-assistant
 cp .env.example .env
 # Edit .env and fill in GOOGLE_API_KEY and TAVILY_API_KEY
 
-# 3. Launch backend and companion Streamlit UI
+# 3. Launch backend
 docker compose up
 
 # 4. Open in browser
-# Streamlit Companion UI:  http://localhost:8501
 # API documentation:        http://localhost:8000/docs
 ```
 
-### Option 2: Local Development (FastAPI, Next.js UI & Streamlit)
+### Option 2: Local Development (FastAPI & Next.js UI)
 
 #### 1. Setup Backend environment
 ```bash
@@ -152,12 +149,6 @@ cp .env.example .env
   npm install
   npm run dev
   # Next.js UI: http://localhost:3000
-  ```
-
-* **Streamlit Companion Frontend (Optional - Terminal 3)**:
-  ```bash
-  source .venv/bin/activate
-  streamlit run app/ui/streamlit_app.py --server.port 8501
   ```
 
 ---
@@ -237,10 +228,8 @@ enterprise-rag-assistant/
 │   │   ├── document_processor.py # PDF/DOCX/TXT chunk splitters
 │   │   ├── vector_store.py      # ChromaDB interface
 │   │   └── memory_store.py      # Long-term memories collection store
-│   ├── services/
-│   │   └── workflow_executor.py # Topological sort and custom DAG runner
-│   └── ui/
-│       └── streamlit_app.py    # Streamlit companion application
+│   └── services/
+│       └── workflow_executor.py # Topological sort and custom DAG runner
 ├── frontend/
 │   ├── src/
 │   │   ├── app/                # Next.js pages: chat, benchmarks, ATS, workflows, logs

@@ -126,16 +126,24 @@ class Settings(BaseSettings):
         default="./data", description="Directory for uploaded documents"
     )
 
-    # ── API Server ────────────────────────────────────────────────
+    # ── API Server ─────────────────────────────────────────────────────────────
     api_host: str = Field(default="0.0.0.0", description="FastAPI host")
     api_port: int = Field(default=8000, description="FastAPI port")
     api_reload: bool = Field(
         default=False, description="Enable hot-reload for development"
     )
-
-    # ── Streamlit ────────────────────────────────────────────────
-    api_base_url: str = Field(
-        default="http://localhost:8000", description="Backend API URL for Streamlit"
+    api_version: str = Field(default="1.0.0", description="API version string")
+    # Comma-separated list of allowed CORS origins, or "*" for wildcard.
+    # Example: "http://localhost:3000,https://myapp.example.com"
+    allowed_origins: str = Field(
+        default="*",
+        description="Comma-separated CORS allowed origins. Use '*' for wildcard (dev only).",
+    )
+    # Maximum allowed upload file size in megabytes
+    max_upload_size_mb: int = Field(
+        default=50,
+        gt=0,
+        description="Maximum file upload size in megabytes",
     )
 
     # ── Conversation Memory ───────────────────────────────────────

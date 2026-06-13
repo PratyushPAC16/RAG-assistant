@@ -1,6 +1,6 @@
 # How TalentMind AI Works: Detailed Technical Architecture & Pipeline Guide
 
-This document provides a comprehensive, component-level breakdown of **TalentMind AI** (also known as Enterprise RAG Assistant). It explains how the multi-agent orchestrator, hybrid retrieval algorithms, document processors, API backend, and the React + Streamlit front-ends work together to deliver a production-ready agentic knowledge assistant.
+This document provides a comprehensive, component-level breakdown of **TalentMind AI** (also known as Enterprise RAG Assistant). It explains how the multi-agent orchestrator, hybrid retrieval algorithms, document processors, API backend, and the React front-end work together to deliver a production-ready agentic knowledge assistant.
 
 ---
 
@@ -29,16 +29,15 @@ This document provides a comprehensive, component-level breakdown of **TalentMin
 TalentMind AI is structured as a decoupled, multi-tier platform built for high-performance retrieval and low-latency interaction:
 
 ```
-┌──────────────────────────────────────┐     ┌──────────────────────────────────────┐
-│     Next.js Frontend (Port 3000)     │     │    Streamlit Frontend (Port 8501)    │
-│ - Montserrat & Glassmorphism Styling │     │ - Real-Time Node Playback            │
-│ - Visual Flow Workflow DAG Builder   │     │ - Telemetry Analytics Dashboard      │
-│ - ATS Resume Upload & Comparison     │     │ - LLM Provider Controller            │
-└──────────────────┬───────────────────┘     └──────────────────┬───────────────────┘
-                   │                                            │
-                   │               HTTP Requests                │
-                   └─────────────────────┬──────────────────────┘
-                                         ▼
+┌──────────────────────────────────────┐
+│     Next.js Frontend (Port 3000)     │
+│ - Montserrat & Glassmorphism Styling │
+│ - Visual Flow Workflow DAG Builder   │
+│ - ATS Resume Upload & Comparison     │
+└──────────────────┬───────────────────┘
+                   │
+                   │               HTTP Requests
+                   ▼
 ┌───────────────────────────────────────────────────────────────────────────────────┐
 │                            FastAPI Backend (Port 8000)                            │
 │ - RESTful Endpoints (/chat, /upload, /analyze-resume, /memories, /benchmark)      │
@@ -53,9 +52,8 @@ TalentMind AI is structured as a decoupled, multi-tier platform built for high-p
 ```
 
 1. **Next.js Frontend**: The primary, modern Web interface built using React, TailwindCSS, Zustand state stores, and React Flow, hosting the main dashboard, chat interface, visual workflow creator, and resume comparison module.
-2. **Streamlit UI Layer**: A companion Python dashboard providing system telemetry charts, live model switching controls, and modular @st.fragment refresh loops.
-3. **FastAPI Application Gateway**: The core backend API that hosts document ingestion pipelines, manages the session stores, runs evaluations, and hosts background tasks.
-4. **LangGraph Agentic Layer**: The state machine orchestrating incoming queries across a fleet of specialized sub-agents based on semantic routing decisions.
+2. **FastAPI Application Gateway**: The core backend API that hosts document ingestion pipelines, manages the session stores, runs evaluations, and hosts background tasks.
+3. **LangGraph Agentic Layer**: The state machine orchestrating incoming queries across a fleet of specialized sub-agents based on semantic routing decisions.
 
 ---
 

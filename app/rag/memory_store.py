@@ -6,6 +6,7 @@ Memory Store — creates and manages a separate ChromaDB collection for long-ter
 from __future__ import annotations
 
 import datetime
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -74,7 +75,7 @@ class MemoryStore:
         metadata = {
             "memory_type": memory_type,
             "session_id": session_id,
-            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
         
         self._collection.add(
@@ -173,11 +174,13 @@ class MemoryStore:
 
 
 _memory_store: MemoryStore | None = None
+_memory_store_lock = threading.Lock()
 
 
 def get_memory_store() -> MemoryStore:
-    """Return the singleton MemoryStore instance."""
+    """Return the singleton MemoryStore instance (thread-safe)."""
     global _memory_store
-    if _memory_store is None:
-        _memory_store = MemoryStore()
+    with _memory_store_lock:
+        if _memory_store is None:
+            _memory_store = MemoryStore()
     return _memory_store

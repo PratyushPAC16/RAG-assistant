@@ -10,7 +10,9 @@ Graph topology:
 from __future__ import annotations
 
 import json
+import threading
 import time
+from datetime import datetime, timezone
 from typing import Any, Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -191,9 +193,9 @@ def memory_retriever_node(state: dict[str, Any]) -> dict[str, Any]:
             try:
                 dt = datetime.fromisoformat(ts)
             except ValueError:
-                dt = datetime.utcnow()
+                dt = datetime.now(timezone.utc)
         else:
-            dt = ts or datetime.utcnow()
+            dt = ts or datetime.now(timezone.utc)
             
         retrieved_memories.append(MemoryRecord(
             memory_id=r["memory_id"],
@@ -532,12 +534,22 @@ class AgentOrchestrator:
                 metadata=metadata,
             )
 
-        # ── Trigger Long-Term Memory Extraction ────────────────────────────────
+        # ── Trigger Long-Term Memory Extraction ─────────────────────────────────
         if final_state.answer:
-            import threading
             from app.utils.long_term_memory import extract_and_persist_memory
+
+            def _safe_extract_memory(sid: str, q: str, ans: str) -> None:
+                try:
+                    extract_and_persist_memory(sid, q, ans)
+                except Exception as exc:
+                    logger.error(
+                        "Long-term memory extraction failed",
+                        extra={"session_id": sid, "error": str(exc)},
+                        exc_info=True,
+                    )
+
             threading.Thread(
-                target=extract_and_persist_memory,
+                target=_safe_extract_memory,
                 args=(sid, query, final_state.answer),
                 daemon=True,
             ).start()
@@ -581,11 +593,13 @@ graph TD
 # ── Module-level singleton ─────────────────────────────────────────────────────
 
 _orchestrator: AgentOrchestrator | None = None
+_orchestrator_lock = threading.Lock()
 
 
 def get_orchestrator() -> AgentOrchestrator:
-    """Return the singleton AgentOrchestrator instance."""
+    """Return the singleton AgentOrchestrator instance (thread-safe)."""
     global _orchestrator
-    if _orchestrator is None:
-        _orchestrator = AgentOrchestrator()
+    with _orchestrator_lock:
+        if _orchestrator is None:
+            _orchestrator = AgentOrchestrator()
     return _orchestrator

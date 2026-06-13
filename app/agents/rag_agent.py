@@ -6,21 +6,17 @@ and Gemini answer generation with source citations.
 
 from __future__ import annotations
 
-import re
-from typing import Any
-
-from langchain_core.messages import HumanMessage, SystemMessage
-from app.utils.llm_factory import get_llm
+import threading
 
 from app.models.schemas import (
     AgentState,
     AgentType,
     RetrievedChunk,
-    SourceCitation,
 )
 from app.rag.retriever import HybridRetriever, get_retriever
 from app.rag.reranker import Reranker, get_reranker
 from app.utils.config import get_settings
+from app.utils.llm_factory import get_llm
 from app.utils.logger import get_logger, log_latency
 
 logger = get_logger(__name__)
@@ -149,72 +145,6 @@ class RAGAgent:
 
         return state
 
-    # ── Internal helpers ──────────────────────────────────────────────────────
-
-    def _build_context(self, chunks: list[RetrievedChunk]) -> str:
-        """
-        Assemble a structured context string from reranked chunks.
-        Each chunk is prefixed with its source and page for inline citation.
-        """
-        parts: list[str] = []
-        for i, chunk in enumerate(chunks, start=1):
-            meta = chunk.metadata
-            header = f"[{i}] Source: {meta.source}"
-            if meta.page:
-                header += f", Page {meta.page}"
-            parts.append(f"{header}\n{chunk.content}")
-        return "\n\n---\n\n".join(parts)
-
-    def _format_history(self, state: AgentState) -> str:
-        """Format conversation history as a plain-text block."""
-        if not state.conversation_history:
-            return "No previous conversation."
-        lines = []
-        for msg in state.conversation_history[-6:]:  # Last 3 turns
-            lines.append(f"{msg.role.value.capitalize()}: {msg.content}")
-        return "\n".join(lines)
-
-    def _generate_answer(
-        self, query: str, context: str, history: str
-    ) -> str:
-        """
-        Call Gemini to generate the final answer given context and history.
-
-        Args:
-            query:   The user's question.
-            context: Assembled chunk context.
-            history: Formatted conversation history.
-
-        Returns:
-            The generated answer string.
-        """
-        prompt = _ANSWER_PROMPT_TEMPLATE.format(
-            context=context, history=history, query=query
-        )
-        messages = [
-            SystemMessage(content=_SYSTEM_PROMPT),
-            HumanMessage(content=prompt),
-        ]
-        response = self._llm.invoke(messages)
-        return response.content
-
-    @staticmethod
-    def _extract_citations(chunks: list[RetrievedChunk]) -> list[SourceCitation]:
-        """
-        Build deduplicated source citations from the reranked chunks.
-        Preserves order by first appearance (best-ranked chunk per source).
-        """
-        seen: set[tuple[str, int | None]] = set()
-        citations: list[SourceCitation] = []
-        for chunk in chunks:
-            key = (chunk.metadata.source, chunk.metadata.page)
-            if key not in seen:
-                seen.add(key)
-                citations.append(
-                    SourceCitation(
-                        document=chunk.metadata.source,
-                        page=chunk.metadata.page,
-                        chunk_id=chunk.chunk_id,
                         relevance_score=chunk.rerank_score,
                         text=chunk.text,
                     )
@@ -225,11 +155,13 @@ class RAGAgent:
 # ── Module-level singleton ─────────────────────────────────────────────────────
 
 _rag_agent: RAGAgent | None = None
+_rag_agent_lock = threading.Lock()
 
 
 def get_rag_agent() -> RAGAgent:
-    """Return the singleton RAGAgent instance."""
+    """Return the singleton RAGAgent instance (thread-safe)."""
     global _rag_agent
-    if _rag_agent is None:
-        _rag_agent = RAGAgent()
+    with _rag_agent_lock:
+        if _rag_agent is None:
+            _rag_agent = RAGAgent()
     return _rag_agent
