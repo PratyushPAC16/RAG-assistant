@@ -331,7 +331,7 @@ export default function ObservabilityPanel() {
                 </p>
               </div>
             ) : (
-              <SourceCards sources={sources} />
+              <SourceCards sources={sources} hideHeader={true} />
             )}
           </div>
         </div>

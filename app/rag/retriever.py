@@ -213,7 +213,7 @@ class HybridRetriever:
 
         if fused:
             result.rrf_score_dist = _compute_score_distribution(
-                [rrf_scores[c.chunk_id] for c in fused if c.chunk_id in rrf_scores]
+                [c.semantic_score for c in fused if c.semantic_score is not None]
             )
 
         # ── Stage 4: Slice to top-K ────────────────────────────────────────────

@@ -35,7 +35,7 @@ interface ChatState {
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   createNewSession: () => void;
-  sendMessage: (query: string, useWebSearch: boolean) => Promise<void>;
+  sendMessage: (query: string, useWebSearch: boolean, filterDocumentIds?: string[]) => Promise<void>;
   clearMetadata: () => void;
 }
 
@@ -103,7 +103,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().clearMetadata();
   },
 
-  sendMessage: async (query, useWebSearch) => {
+  sendMessage: async (query, useWebSearch, filterDocumentIds) => {
     if (!query.trim()) return;
 
     let sessionId = get().activeSessionId;
@@ -132,6 +132,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         query,
         session_id: sessionId!,
         use_web_search: useWebSearch,
+        filter_document_ids: filterDocumentIds,
       });
 
       // Save metadata

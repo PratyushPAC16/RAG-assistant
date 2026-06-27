@@ -141,7 +141,7 @@ class Settings(BaseSettings):
     )
     # Maximum allowed upload file size in megabytes
     max_upload_size_mb: int = Field(
-        default=50,
+        default=75,
         gt=0,
         description="Maximum file upload size in megabytes",
     )

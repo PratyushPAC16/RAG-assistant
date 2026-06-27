@@ -80,6 +80,9 @@ class VectorStore:
                 metadata={"hnsw:space": "cosine"},
             )
 
+    # ChromaDB hard limit on items per batch call
+    _CHROMA_MAX_BATCH = 5000
+
     # ── Write operations ──────────────────────────────────────────────────────
 
     def add_documents(
@@ -89,6 +92,11 @@ class VectorStore:
     ) -> list[str]:
         """
         Embed and add document chunks to the collection.
+
+        Large documents (e.g. 2000-page PDFs) can produce tens of thousands of
+        chunks. ChromaDB enforces a hard maximum batch size (~5461 items), so
+        this method splits the work into batches of at most ``_CHROMA_MAX_BATCH``
+        items and inserts them sequentially.
 
         Args:
             documents:   LangChain Document objects (page_content + metadata).
@@ -123,24 +131,34 @@ class VectorStore:
             collection=self.collection_name,
         ):
             embeddings = self._embedding_service.embed_documents(texts)
-            try:
-                self._collection.add(
-                    ids=ids,
-                    documents=texts,
-                    embeddings=embeddings,
-                    metadatas=serialised_metas,
+
+            # Insert in batches to stay within ChromaDB's hard per-call limit
+            total = len(ids)
+            batch_size = self._CHROMA_MAX_BATCH
+            for start in range(0, total, batch_size):
+                end = min(start + batch_size, total)
+                logger.debug(
+                    "Inserting ChromaDB batch",
+                    extra={"batch": f"{start}–{end}", "total": total},
                 )
-            except Exception as exc:
-                if "dimension" in str(exc).lower() or "dimensionality" in str(exc).lower():
-                    logger.error(
-                        "ChromaDB dimension mismatch! This usually happens when you switch embedding providers (e.g. from Gemini to Local or Ollama) without resetting the database. Please delete the directory 'chroma_db/' in your workspace to reset the database.",
-                        extra={"error": str(exc)}
+                try:
+                    self._collection.add(
+                        ids=ids[start:end],
+                        documents=texts[start:end],
+                        embeddings=embeddings[start:end],
+                        metadatas=serialised_metas[start:end],
                     )
-                    raise ValueError(
-                        "Embedding dimension mismatch with the existing ChromaDB collection. "
-                        "Please delete the 'chroma_db/' directory in your workspace to reset the database."
-                    ) from exc
-                raise
+                except Exception as exc:
+                    if "dimension" in str(exc).lower() or "dimensionality" in str(exc).lower():
+                        logger.error(
+                            "ChromaDB dimension mismatch! This usually happens when you switch embedding providers (e.g. from Gemini to Local or Ollama) without resetting the database. Please delete the directory 'chroma_db/' in your workspace to reset the database.",
+                            extra={"error": str(exc)}
+                        )
+                        raise ValueError(
+                            "Embedding dimension mismatch with the existing ChromaDB collection. "
+                            "Please delete the 'chroma_db/' directory in your workspace to reset the database."
+                        ) from exc
+                    raise
 
         logger.info(
             "Documents added to vector store",

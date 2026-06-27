@@ -29,6 +29,11 @@ import {
   Activity,
   History,
   Coins,
+  Files,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -67,6 +72,25 @@ export default function ChatPage() {
 
   const [input, setInput] = useState("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  
+  // Document selection states
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false);
+  const [docSearchQuery, setDocSearchQuery] = useState("");
+
+  // Collapsible Session sidebar state
+  const [isSessionSidebarCollapsed, setIsSessionSidebarCollapsed] = useState(false);
+
+  // Observability Panel toggle state
+  const [showObservability, setShowObservability] = useState(true);
+
+  const toggleDocSelection = (docId: string) => {
+    setSelectedDocIds((prev) =>
+      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+    );
+  };
+
+  const clearDocSelection = () => setSelectedDocIds([]);
 
   const examplePrompts = [
     "Summarize Resume.pdf",
@@ -76,7 +100,7 @@ export default function ChatPage() {
     "Review my resume against the uploaded job description",
   ];
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -85,8 +109,8 @@ export default function ChatPage() {
   }, [fetchSessions, fetchHealth]);
 
   useEffect(() => {
-    if (messages.length > 0 || isGenerating) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
   }, [messages, isGenerating]);
 
@@ -96,7 +120,7 @@ export default function ChatPage() {
 
     const query = input;
     setInput("");
-    await sendMessage(query, useWebSearch);
+    await sendMessage(query, useWebSearch, selectedDocIds.length > 0 ? selectedDocIds : undefined);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -131,7 +155,7 @@ export default function ChatPage() {
       useChatStore.setState({
         messages: messages.slice(0, index),
       });
-      await sendMessage(lastUserQuery, useWebSearch);
+      await sendMessage(lastUserQuery, useWebSearch, selectedDocIds.length > 0 ? selectedDocIds : undefined);
     }
   };
 
@@ -144,63 +168,94 @@ export default function ChatPage() {
   return (
     <div className="flex-1 flex h-full overflow-hidden">
       {/* 1. Chat Sessions Sidebar */}
-      <div className="w-64 bg-zinc-950/40 border-r border-zinc-800/40 flex flex-col shrink-0 h-full backdrop-blur-sm">
-        <div className="p-4 border-b border-zinc-800/20">
-          <Button
-            onClick={createNewSession}
-            variant="outline"
-            className="w-full flex items-center justify-center gap-1.5 font-semibold hover:border-primary/40 hover:bg-zinc-900/60"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-            New Chat
-          </Button>
-        </div>
+      <div className={cn(
+        "bg-zinc-950/40 border-r border-zinc-800/40 flex flex-col shrink-0 h-full backdrop-blur-sm transition-all duration-300 ease-in-out relative",
+        isSessionSidebarCollapsed ? "w-12" : "w-64"
+      )}>
+        {isSessionSidebarCollapsed ? (
+          <div className="p-2 border-b border-zinc-800/20 flex flex-col items-center gap-3">
+            <button
+              onClick={() => setIsSessionSidebarCollapsed(false)}
+              className="p-1.5 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-zinc-150 transition-colors"
+              title="Expand Sessions"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={createNewSession}
+              className="w-8 h-8 rounded-lg border border-zinc-800/60 flex items-center justify-center hover:border-primary/40 hover:bg-zinc-900/60 transition-all"
+              title="New Chat"
+            >
+              <Plus className="w-4 h-4 text-primary" />
+            </button>
+          </div>
+        ) : (
+          <div className="p-4 border-b border-zinc-800/20 flex items-center justify-between gap-2">
+            <Button
+              onClick={createNewSession}
+              variant="outline"
+              className="flex-1 flex items-center justify-center gap-1.5 font-semibold hover:border-primary/40 hover:bg-zinc-900/60 text-xs py-1.5 h-9"
+            >
+              <Plus className="w-4 h-4 text-primary" />
+              New Chat
+            </Button>
+            <button
+              onClick={() => setIsSessionSidebarCollapsed(true)}
+              className="p-1.5 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-zinc-100 transition-colors"
+              title="Collapse Sessions"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Sessions list */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-          {sessions.length === 0 ? (
-            <div className="text-center py-8 text-zinc-650 text-xs font-medium">
-              No sessions found
-            </div>
-          ) : (
-            sessions.map((s) => {
-              const isActive = activeSessionId === s.session_id;
-              return (
-                <div
-                  key={s.session_id}
-                  className={cn(
-                    "flex items-center justify-between group rounded-lg p-2.5 text-xs transition-all duration-150 cursor-pointer border",
-                    isActive
-                      ? "bg-zinc-900/80 border-zinc-800/80 text-zinc-200"
-                      : "border-transparent text-zinc-450 hover:text-zinc-250 hover:bg-zinc-900/20"
-                  )}
-                  onClick={() => selectSession(s.session_id)}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <MessageSquare className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-350" />
-                    <span className="truncate font-medium">
-                      {s.title || `Chat Session ${s.session_id.substring(0, 6)}`}
-                    </span>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteSession(s.session_id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
-                    title="Delete Session"
+        {!isSessionSidebarCollapsed && (
+          <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+            {sessions.length === 0 ? (
+              <div className="text-center py-8 text-zinc-650 text-xs font-medium">
+                No sessions found
+              </div>
+            ) : (
+              sessions.map((s) => {
+                const isActive = activeSessionId === s.session_id;
+                return (
+                  <div
+                    key={s.session_id}
+                    className={cn(
+                      "flex items-center justify-between group rounded-lg p-2.5 text-xs transition-all duration-150 cursor-pointer border",
+                      isActive
+                        ? "bg-zinc-900/80 border-zinc-800/80 text-zinc-200"
+                        : "border-transparent text-zinc-450 hover:text-zinc-250 hover:bg-zinc-900/20"
+                    )}
+                    onClick={() => selectSession(s.session_id)}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <MessageSquare className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-350" />
+                      <span className="truncate font-medium">
+                        {s.title || `Chat Session ${s.session_id.substring(0, 6)}`}
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSession(s.session_id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
+                      title="Delete Session"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
       {/* 2. Main Chat viewport */}
-      <div className="flex-1 flex flex-col h-full bg-zinc-900/10 min-w-0 relative">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-900/10 min-w-0 relative">
         {/* Top Provider Control Center Header */}
         <header className="h-16 border-b border-zinc-800/40 flex items-center justify-between px-6 shrink-0 bg-zinc-950/20 backdrop-blur-md z-20">
           <div className="flex items-center gap-4">
@@ -252,6 +307,141 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Document Filter Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsDocDropdownOpen(!isDocDropdownOpen)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900/40 border border-zinc-850/40 text-xs text-zinc-350 hover:text-zinc-200 hover:bg-zinc-850/30 transition-all font-medium select-none"
+              >
+                <Files className="w-3.5 h-3.5 text-primary" />
+                <span>
+                  {selectedDocIds.length === 0
+                    ? "All Documents"
+                    : `${selectedDocIds.length} Document${selectedDocIds.length > 1 ? "s" : ""}`}
+                </span>
+              </button>
+
+              <AnimatePresence>
+                {isDocDropdownOpen && (
+                  <>
+                    {/* Backdrop to close */}
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => {
+                        setIsDocDropdownOpen(false);
+                        setDocSearchQuery("");
+                      }}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-72 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl p-3 z-40 space-y-2.5 glass-panel"
+                    >
+                      <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
+                        <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider select-none">
+                          Filter Knowledge Base
+                        </span>
+                        {selectedDocIds.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              clearDocSelection();
+                              setDocSearchQuery("");
+                            }}
+                            className="text-[10px] text-primary hover:underline font-semibold"
+                          >
+                            Reset to All
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Search Bar */}
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Search files..."
+                          value={docSearchQuery}
+                          onChange={(e) => setDocSearchQuery(e.target.value)}
+                          className="w-full bg-zinc-900 border border-zinc-850 rounded-lg pl-8 pr-7 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-primary/50 transition-colors"
+                        />
+                        {docSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setDocSearchQuery("")}
+                            className="absolute right-2 top-2 p-0.5 hover:bg-zinc-850 rounded text-zinc-500 hover:text-zinc-300 transition-colors animate-fade-in"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                        {(() => {
+                          const indexedDocs = documents.filter((doc) => doc.status === "indexed");
+                          
+                          if (indexedDocs.length === 0) {
+                            return (
+                              <div className="text-center py-6 text-zinc-500 text-xs">
+                                No indexed documents available
+                              </div>
+                            );
+                          }
+
+                          const filteredDocs = indexedDocs.filter((doc) =>
+                            doc.filename.toLowerCase().includes(docSearchQuery.toLowerCase())
+                          );
+
+                          if (filteredDocs.length === 0) {
+                            return (
+                              <div className="text-center py-6 text-zinc-500 text-xs">
+                                No matching documents found
+                              </div>
+                            );
+                          }
+
+                          return filteredDocs.map((doc) => {
+                            const isSelected = selectedDocIds.includes(doc.document_id);
+                            const displayFilename = doc.filename.replace(/^[a-fA-F0-9]{32}_/i, "");
+                            
+                            return (
+                              <label
+                                key={doc.document_id}
+                                className={cn(
+                                  "flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors text-xs border border-transparent",
+                                  isSelected
+                                    ? "bg-primary/5 border-primary/20 text-zinc-200"
+                                    : "hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-300"
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleDocSelection(doc.document_id)}
+                                  className="rounded border-zinc-700 bg-zinc-900 text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold truncate" title={doc.filename}>
+                                    {displayFilename}
+                                  </p>
+                                  <p className="text-[9px] text-zinc-550 font-mono mt-0.5">
+                                    {doc.num_chunks} chunks
+                                  </p>
+                                </div>
+                              </label>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Use Web search check */}
             <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer select-none">
               <input
@@ -262,6 +452,22 @@ export default function ChatPage() {
               />
               <span className="font-medium text-zinc-350 hover:text-zinc-200 transition-colors">Web Search</span>
             </label>
+
+            {/* Toggle Observability Center */}
+            <button
+              type="button"
+              onClick={() => setShowObservability(!showObservability)}
+              className={cn(
+                "p-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 transition-all select-none h-8",
+                showObservability
+                  ? "bg-primary/10 border-primary/20 text-primary shadow-[0_0_8px_rgba(214,91,180,0.15)]"
+                  : "bg-zinc-900/40 border-zinc-850/40 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850/30"
+              )}
+              title={showObservability ? "Hide Observability Center" : "Show Observability Center"}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Observability</span>
+            </button>
 
             <Link href="/settings">
               <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg" title="Provider Settings">
@@ -286,7 +492,7 @@ export default function ChatPage() {
         )}
 
         {/* Message bubble stream */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.length === 0 && !isGenerating ? (
             <div className="min-h-full flex flex-col justify-center items-center text-center p-6 relative py-12">
               {/* Glow background */}
@@ -509,7 +715,6 @@ export default function ChatPage() {
               )}
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Input */}
@@ -560,7 +765,7 @@ export default function ChatPage() {
       </div>
 
       {/* 3. Observability Panel (Workflow, Citations, Metrics tabs) */}
-      <ObservabilityPanel />
+      {showObservability && <ObservabilityPanel />}
     </div>
   );
 }

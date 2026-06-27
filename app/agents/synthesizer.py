@@ -160,9 +160,9 @@ class ResponseSynthesizer:
         if not state.conversation_history:
             return "No previous conversation."
         lines = []
-        for i, msg in enumerate(state.conversation_history[-6:], start=1):
+        for msg in state.conversation_history[-6:]:
             role_label = "User" if msg.role == "user" else "Assistant"
-            lines.append(f"[Turn {i}] {role_label}: {msg.content}")
+            lines.append(f"{role_label}: {msg.content}")
         return "\n".join(lines)
 
     @staticmethod
@@ -174,6 +174,13 @@ class ResponseSynthesizer:
         """
         citations: list[SourceCitation] = []
         seen: set[tuple[str, int | None] | str] = set()
+
+        # Helper to get base filename without UUID prefix
+        def get_base_filename(filename: str) -> str:
+            match = re.match(r"^[a-f0-9]{32}_(.+)$", filename)
+            if match:
+                return match.group(1)
+            return filename
 
         # 1. Document citations: [Source: <filename>, Page <N>] or [Source: <filename>]
         doc_matches = re.findall(r"\[Source:\s*([^,\]]+)(?:,\s*Page\s*(\d+))?\]", answer, re.IGNORECASE)
@@ -187,7 +194,7 @@ class ResponseSynthesizer:
                 # Find matching chunk metadata
                 matched_chunk = None
                 for chunk in chunks:
-                    if chunk.metadata.source.lower() == doc_name.lower():
+                    if chunk.metadata.source.lower() == doc_name.lower() or get_base_filename(chunk.metadata.source).lower() == doc_name.lower():
                         if page is None or chunk.metadata.page == page:
                             matched_chunk = chunk
                             break
@@ -199,7 +206,7 @@ class ResponseSynthesizer:
                             page=matched_chunk.metadata.page,
                             chunk_id=matched_chunk.chunk_id,
                             relevance_score=matched_chunk.rerank_score or 1.0,
-                            text=matched_chunk.text,
+                            text=matched_chunk.content,
                         )
                     )
                 else:
@@ -209,6 +216,28 @@ class ResponseSynthesizer:
                             document=doc_name,
                             page=page,
                             relevance_score=0.5,
+                        )
+                    )
+
+        # Robust fallback: Check if the LLM mentioned any retrieved document source names directly in the text
+        # (Very common for local models like llama3.2 which copy source names verbatim from prompt headers)
+        for chunk in chunks:
+            source_name = chunk.metadata.source
+            base_name = get_base_filename(source_name)
+            
+            # Look for mentions of full source name or base filename (case-insensitive)
+            if source_name.lower() in answer.lower() or base_name.lower() in answer.lower():
+                page = chunk.metadata.page
+                key = (source_name, page)
+                if key not in seen:
+                    seen.add(key)
+                    citations.append(
+                        SourceCitation(
+                            document=source_name,
+                            page=page,
+                            chunk_id=chunk.chunk_id,
+                            relevance_score=chunk.rerank_score or 1.0,
+                            text=chunk.content,
                         )
                     )
 

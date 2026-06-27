@@ -28,6 +28,9 @@ export default function DocumentsPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const [sortBy, setSortBy] = useState<string>("date_desc");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
   // Fetch Documents list
   const { data, isLoading } = useQuery({
     queryKey: ["documents"],
@@ -94,9 +97,57 @@ export default function DocumentsPage() {
   };
 
   const documents = data?.documents || [];
-  const filteredDocs = documents.filter((doc) =>
-    doc.filename.toLowerCase().includes(search.toLowerCase())
-  );
+  
+  const filteredAndSortedDocs = React.useMemo(() => {
+    let docs = [...documents];
+
+    // Filter by name
+    if (search.trim()) {
+      docs = docs.filter((doc) =>
+        doc.filename.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    // Filter by status
+    if (statusFilter !== "all") {
+      docs = docs.filter((doc) => doc.status === statusFilter);
+    }
+
+    // Sort documents
+    docs.sort((a, b) => {
+      if (sortBy === "name_asc") {
+        return a.filename.localeCompare(b.filename);
+      }
+      if (sortBy === "name_desc") {
+        return b.filename.localeCompare(a.filename);
+      }
+      if (sortBy === "chunks_desc") {
+        return b.num_chunks - a.num_chunks;
+      }
+      if (sortBy === "chunks_asc") {
+        return a.num_chunks - b.num_chunks;
+      }
+      if (sortBy === "size_desc") {
+        return b.file_size_bytes - a.file_size_bytes;
+      }
+      if (sortBy === "size_asc") {
+        return a.file_size_bytes - b.file_size_bytes;
+      }
+      if (sortBy === "date_desc") {
+        const dateA = a.indexed_at || a.created_at || "";
+        const dateB = b.indexed_at || b.created_at || "";
+        return dateB.localeCompare(dateA);
+      }
+      if (sortBy === "date_asc") {
+        const dateA = a.indexed_at || a.created_at || "";
+        const dateB = b.indexed_at || b.created_at || "";
+        return dateA.localeCompare(dateB);
+      }
+      return 0;
+    });
+
+    return docs;
+  }, [documents, search, statusFilter, sortBy]);
 
   return (
     <div className="flex-1 overflow-y-auto p-8 space-y-8">
@@ -118,7 +169,7 @@ export default function DocumentsPage() {
             <CardHeader>
               <CardTitle className="text-md font-semibold text-zinc-100">Upload New File</CardTitle>
               <CardDescription className="text-zinc-500 text-xs">
-                Supports PDF, DOCX, and TXT files up to 25MB.
+                Supports PDF, DOCX, and TXT files up to 75MB.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -177,21 +228,57 @@ export default function DocumentsPage() {
 
         {/* Documents Table List - 2 columns wide */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
-              <Input
-                type="text"
-                placeholder="Search documents by name..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-zinc-950/40 border-zinc-800/60 focus:border-primary/60 text-xs h-9 text-zinc-200"
-              />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+                <Input
+                  type="text"
+                  placeholder="Search documents by name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 bg-zinc-950/40 border-zinc-800/60 focus:border-primary/60 text-xs h-9 text-zinc-200"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-2 bg-zinc-950/40 border border-zinc-800/60 rounded-lg px-2.5 h-9">
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold select-none">Status:</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-transparent border-0 outline-0 ring-0 focus:ring-0 text-xs text-zinc-300 font-medium cursor-pointer pr-1"
+                >
+                  <option value="all" className="bg-zinc-950 text-zinc-300">All</option>
+                  <option value="indexed" className="bg-zinc-950 text-zinc-300">Indexed</option>
+                  <option value="processing" className="bg-zinc-950 text-zinc-300">Processing</option>
+                  <option value="failed" className="bg-zinc-950 text-zinc-300">Failed</option>
+                </select>
+              </div>
+
+              {/* Sort By Dropdown */}
+              <div className="flex items-center gap-2 bg-zinc-950/40 border border-zinc-800/60 rounded-lg px-2.5 h-9">
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold select-none">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-transparent border-0 outline-0 ring-0 focus:ring-0 text-xs text-zinc-300 font-medium cursor-pointer pr-1"
+                >
+                  <option value="date_desc" className="bg-zinc-950 text-zinc-300">Date (Newest)</option>
+                  <option value="date_asc" className="bg-zinc-950 text-zinc-300">Date (Oldest)</option>
+                  <option value="chunks_desc" className="bg-zinc-950 text-zinc-300">Chunks (High to Low)</option>
+                  <option value="chunks_asc" className="bg-zinc-950 text-zinc-300">Chunks (Low to High)</option>
+                  <option value="size_desc" className="bg-zinc-950 text-zinc-300">Size (Large to Small)</option>
+                  <option value="size_asc" className="bg-zinc-950 text-zinc-300">Size (Small to Large)</option>
+                  <option value="name_asc" className="bg-zinc-950 text-zinc-300">Name (A-Z)</option>
+                  <option value="name_desc" className="bg-zinc-950 text-zinc-300">Name (Z-A)</option>
+                </select>
+              </div>
             </div>
             
-            <div className="flex items-center gap-1.5 bg-zinc-900/40 border border-zinc-800/30 px-3 py-1.5 rounded-lg text-[10px] text-zinc-400 font-medium font-mono shrink-0">
+            <div className="flex items-center gap-1.5 bg-zinc-900/40 border border-zinc-800/30 px-3 py-1.5 rounded-lg text-[10px] text-zinc-400 font-medium font-mono shrink-0 self-end md:self-auto">
               <HardDrive className="w-3.5 h-3.5" />
-              Total: {documents.length} docs
+              Total: {filteredAndSortedDocs.length} of {documents.length} docs
             </div>
           </div>
 
@@ -217,14 +304,14 @@ export default function DocumentsPage() {
                         </td>
                       </tr>
                     ))
-                  ) : filteredDocs.length === 0 ? (
+                  ) : filteredAndSortedDocs.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="p-8 text-center text-zinc-500 font-medium">
                         No documents indexed. Upload files on the left to start.
                       </td>
                     </tr>
                   ) : (
-                    filteredDocs.map((doc) => {
+                    filteredAndSortedDocs.map((doc) => {
                       let fileColor = "text-zinc-400";
                       if (doc.file_type === "pdf") fileColor = "text-rose-400";
                       if (doc.file_type === "docx") fileColor = "text-blue-400";
