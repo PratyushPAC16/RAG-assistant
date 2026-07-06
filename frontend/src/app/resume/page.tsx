@@ -473,7 +473,7 @@ export default function ResumeAnalyzerPage() {
                 <CardContent className="flex-grow flex items-center justify-center py-4">
                   <div className="w-full h-[250px] relative select-none">
                     <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart cx="50%" cy="50%" radius="75%" data={radarData}>
+                      <RadarChart cx="50%" cy="50%" data={radarData}>
                         <PolarGrid stroke="#30232E" />
                         <PolarAngleAxis
                           dataKey="subject"

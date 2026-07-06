@@ -31,6 +31,12 @@ import { formatDateTime } from "@/lib/utils";
 
 const COLORS = ["#D65BB4", "#66415C", "#ACFF5D", "#FF9F5B", "#E05B5B"];
 
+/** Explicit shape for Recharts pie chart data items */
+interface ChartDataItem {
+  name: string;
+  value: number;
+}
+
 export default function AnalyticsPage() {
   const { data: analytics, isLoading } = useQuery({
     queryKey: ["analytics-extended"],
@@ -58,13 +64,13 @@ export default function AnalyticsPage() {
   const providerDist = analytics?.provider_usage || {};
   const recentLogs = analytics?.recent_metrics || [];
 
-  // Parse Pie charts
-  const agentChartData = Object.entries(agentDist).map(([key, val]) => ({
+  // Parse Pie charts — explicitly typed so entry.value is number in JSX
+  const agentChartData: ChartDataItem[] = Object.entries(agentDist).map(([key, val]) => ({
     name: key.toUpperCase(),
     value: val,
   }));
 
-  const providerChartData = Object.entries(providerDist).map(([key, val]) => ({
+  const providerChartData: ChartDataItem[] = Object.entries(providerDist).map(([key, val]) => ({
     name: key.toUpperCase(),
     value: val,
   }));

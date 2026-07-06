@@ -155,6 +155,123 @@ class ResponseSynthesizer:
 
         return state
 
+    def stream_run(self, state: AgentState):
+        """
+        Streaming version of :meth:`run`.
+
+        Yields ``str`` token chunks as the LLM generates them, then yields the
+        completed :class:`~app.models.schemas.AgentState` as the final item.
+
+        Usage::
+
+            for item in synthesizer.stream_run(state):
+                if isinstance(item, str):
+                    yield item          # push token to client
+                else:
+                    final_state = item  # AgentState with sources + metadata
+
+        Args:
+            state: AgentState with ``reranked_chunks``, ``web_results``,
+                   ``conversation_history``, and ``retrieved_memories`` set.
+
+        Yields:
+            ``str`` for each LLM token, then the final AgentState as the last item.
+        """
+        import time as _time
+
+        query = state.query
+        logger.info("ResponseSynthesizer.stream_run called", extra={"query": query[:80]})
+
+        try:
+            # ── Build context (same logic as run()) ────────────────────────
+            context_parts: list[str] = []
+
+            if getattr(state, "retrieved_memories", None):
+                mem_lines = []
+                for mem in state.retrieved_memories:
+                    m_type = getattr(mem, "memory_type", "") or (
+                        mem.get("memory_type", "") if isinstance(mem, dict) else ""
+                    )
+                    m_content = getattr(mem, "content", "") or (
+                        mem.get("content", "") if isinstance(mem, dict) else ""
+                    )
+                    mem_lines.append(f"- [{m_type.upper()}] {m_content}")
+                context_parts.append(
+                    "### RELEVANT LONG-TERM USER MEMORIES & PREFERENCES:\n" + "\n".join(mem_lines)
+                )
+
+            if state.reranked_chunks:
+                doc_lines = []
+                for i, chunk in enumerate(state.reranked_chunks, start=1):
+                    meta = chunk.metadata
+                    header = f"Document Chunk {i} - Source: {meta.source}"
+                    if meta.page:
+                        header += f", Page {meta.page}"
+                    doc_lines.append(f"{header}\nContent: {chunk.content}")
+                context_parts.append("### UPLOADED DOCUMENTS:\n" + "\n\n".join(doc_lines))
+
+            if state.web_results:
+                web_lines = []
+                for i, res in enumerate(state.web_results, start=1):
+                    web_lines.append(
+                        f"Web Source {i} - Title: {res.get('title', 'Web Source')}\n"
+                        f"URL: {res.get('url', '')}\n"
+                        f"Content: {res.get('content', '')}"
+                    )
+                context_parts.append("### WEB SEARCH RESULTS:\n" + "\n\n".join(web_lines))
+
+            context_block = (
+                "\n\n---\n\n".join(context_parts) if context_parts else "No context available."
+            )
+            history_block = self._format_history(state)
+            prompt = _SYNTHESIS_PROMPT_TEMPLATE.format(
+                query=query, context_block=context_block, history_block=history_block
+            )
+            messages = [
+                SystemMessage(content=_SYNTHESIS_SYSTEM_PROMPT),
+                HumanMessage(content=prompt),
+            ]
+
+            # ── Stream tokens ───────────────────────────────────────────────
+            t0 = _time.perf_counter()
+            full_answer = ""
+            for chunk in self._llm.stream(messages):
+                token = chunk.content if hasattr(chunk, "content") else str(chunk)
+                if token:
+                    full_answer += token
+                    yield token
+
+            elapsed_ms = (_time.perf_counter() - t0) * 1000
+            state.latency_ms["synthesis_llm"] = round(elapsed_ms, 2)
+            state.answer = full_answer
+            state.sources = self._extract_citations(
+                full_answer, state.reranked_chunks, state.web_results
+            )
+
+            # Best-effort token cost estimate (stream API may not provide usage)
+            try:
+                from app.utils.cost import calculate_cost
+
+                est_completion = max(1, len(full_answer) // 4)
+                state.completion_tokens += est_completion
+                state.cost_usd += calculate_cost(state.prompt_tokens, est_completion)
+            except Exception:
+                pass
+
+        except Exception as exc:
+            error_str = str(exc)
+            logger.error(
+                "ResponseSynthesizer.stream_run failed",
+                extra={"error": error_str, "query": query[:80]},
+                exc_info=True,
+            )
+            state.error = error_str
+            state.answer = f"Error during synthesis: {error_str}"
+            yield state.answer
+
+        # Always yield the final completed state as the last item
+        yield state
+
     def _format_history(self, state: AgentState) -> str:
         """Format conversation history for LLM prompt."""
         if not state.conversation_history:

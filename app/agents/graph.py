@@ -380,7 +380,7 @@ def _routing_decision(state: dict[str, Any]) -> list[str]:
 
 def build_graph() -> Any:
     """
-    Construct and compile the LangGraph StateGraph.
+    Construct and compile the full LangGraph StateGraph (retrieval + synthesis).
 
     Graph topology::
 
@@ -439,6 +439,61 @@ def build_graph() -> Any:
     return graph.compile()
 
 
+def build_retrieval_graph() -> Any:
+    """
+    Compile a **retrieval-only** subgraph — identical to :func:`build_graph`
+    but stopping immediately after the agent nodes (RAG / web / memory).
+
+    Used by the streaming endpoint:  this graph gathers context (chunks,
+    web results, memories) and the caller then streams synthesis separately
+    so the LLM tokens can be pushed to the client as they arrive.
+
+    Graph topology::
+
+        START
+          │
+        memory_retriever_node
+          │
+        router_node
+          │
+       ┌──┴──────────┬────────────┐
+     rag_node    web_node   memory_node
+       └──┬──────────┴────────────┘
+          │
+         END   ← no synthesizer / formatter
+
+    Returns:
+        Compiled LangGraph :class:`CompiledGraph`.
+    """
+    graph = StateGraph(GraphState)
+
+    graph.add_node("memory_retriever_node", memory_retriever_node)
+    graph.add_node("router_node", router_node)
+    graph.add_node("rag_node", rag_node)
+    graph.add_node("web_node", web_node)
+    graph.add_node("memory_node", memory_node)
+
+    graph.add_edge(START, "memory_retriever_node")
+    graph.add_edge("memory_retriever_node", "router_node")
+
+    graph.add_conditional_edges(
+        "router_node",
+        _routing_decision,
+        {
+            "rag_node": "rag_node",
+            "web_node": "web_node",
+            "memory_node": "memory_node",
+        },
+    )
+
+    # Converge all agent branches directly to END
+    graph.add_edge("rag_node", END)
+    graph.add_edge("web_node", END)
+    graph.add_edge("memory_node", END)
+
+    return graph.compile()
+
+
 # ── Top-level orchestrator class ───────────────────────────────────────────────
 
 class AgentOrchestrator:
@@ -459,8 +514,9 @@ class AgentOrchestrator:
 
     def __init__(self) -> None:
         self._graph = build_graph()
+        self._retrieval_graph = build_retrieval_graph()
         self._memory_agent = get_memory_agent()
-        logger.info("AgentOrchestrator ready — LangGraph compiled")
+        logger.info("AgentOrchestrator ready — LangGraph compiled (full + retrieval-only)")
 
     def run(
         self,
@@ -565,6 +621,94 @@ class AgentOrchestrator:
         )
 
         return final_state
+
+    def run_retrieval(
+        self,
+        query: str,
+        session_id: str,
+        filter_document_ids: list[str] | None = None,
+    ) -> AgentState:
+        """
+        Run only the retrieval phase (memory → router → RAG/web/memory agents),
+        stopping **before** synthesis.  The returned :class:`AgentState` contains
+        ``retrieved_chunks``, ``reranked_chunks``, ``web_results``,
+        ``retrieved_memories``, ``conversation_history``, ``agent_type``,
+        and ``routing_trace`` — everything the synthesizer needs.
+
+        Used exclusively by the ``/chat/stream`` endpoint so synthesis can be
+        streamed independently after context is gathered.
+
+        Args:
+            query:               The user's question.
+            session_id:          Session ID for memory continuity.
+            filter_document_ids: Optional document ID filter.
+
+        Returns:
+            Partially-complete :class:`AgentState` (no ``answer`` yet).
+        """
+        stored_history = self._memory_agent.get_session_history(session_id)
+        initial_state = AgentState(
+            query=query,
+            session_id=session_id,
+            conversation_history=stored_history,
+            filter_document_ids=filter_document_ids,
+        )
+        with log_latency(logger, "retrieval_pipeline", session_id=session_id, query=query):
+            raw = self._retrieval_graph.invoke(_state_to_dict(initial_state))
+        return _dict_to_state(raw)
+
+    def persist_exchange(
+        self,
+        session_id: str,
+        query: str,
+        final_state: AgentState,
+    ) -> None:
+        """
+        Save the user query and assistant answer to session memory, and trigger
+        background long-term memory extraction.  Called by the streaming
+        endpoint once the full answer has been assembled from stream chunks.
+        """
+        self._memory_agent.add_to_memory(
+            session_id=session_id,
+            role=MessageRole.USER,
+            content=query,
+        )
+        if final_state.answer:
+            metadata = {
+                "sources": [s.model_dump() for s in final_state.sources],
+                "latency_ms": final_state.latency_ms,
+                "routing_decision": final_state.routing_decision.model_dump() if final_state.routing_decision else None,
+                "routing_trace": final_state.routing_trace,
+                "prompt_tokens": final_state.prompt_tokens,
+                "completion_tokens": final_state.completion_tokens,
+                "total_tokens": final_state.total_tokens,
+                "cost_usd": final_state.cost_usd,
+                "retrieved_memories": [m.model_dump(mode="json") for m in final_state.retrieved_memories],
+            }
+            self._memory_agent.add_to_memory(
+                session_id=session_id,
+                role=MessageRole.ASSISTANT,
+                content=final_state.answer,
+                agent_type=final_state.agent_type,
+                metadata=metadata,
+            )
+            from app.utils.long_term_memory import extract_and_persist_memory
+
+            def _safe_extract(sid: str, q: str, ans: str) -> None:
+                try:
+                    extract_and_persist_memory(sid, q, ans)
+                except Exception as exc:
+                    logger.error(
+                        "Long-term memory extraction failed",
+                        extra={"session_id": sid, "error": str(exc)},
+                        exc_info=True,
+                    )
+
+            threading.Thread(
+                target=_safe_extract,
+                args=(session_id, query, final_state.answer),
+                daemon=True,
+            ).start()
 
     def get_graph_mermaid(self) -> str:
         """

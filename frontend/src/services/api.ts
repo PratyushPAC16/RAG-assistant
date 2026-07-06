@@ -10,6 +10,10 @@ import {
   BenchmarkRun,
   WorkflowDefinition,
   WorkflowExecutionResult,
+  ChatSession,
+  AnalyticsResponse,
+  ExtendedAnalyticsResponse,
+  ResumeAnalysisResponse,
 } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -65,8 +69,89 @@ class ApiService {
     });
   }
 
-  async listSessions(): Promise<any[]> {
-    return this.request<any[]>("/chat/sessions");
+  /**
+   * Stream a chat response via Server-Sent Events.
+   *
+   * The backend emits three event types in order:
+   *  1. `routing`  — once retrieval is done, carries agent type + trace
+   *  2. `token`    — one per LLM output token
+   *  3. `metadata` — final event with sources, latency, tokens, etc.
+   *
+   * @param req        - Same shape as a regular chat request.
+   * @param onRouting  - Called once with routing info before first token.
+   * @param onToken    - Called for each streamed token string.
+   * @param onDone     - Called once with the final metadata payload.
+   * @param onError    - Called if the stream emits an error event.
+   * @returns An AbortController; call `.abort()` to cancel the stream.
+   */
+  chatStream(
+    req: ChatRequest,
+    onRouting: (event: { agent: string; trace: string[]; routing_decision: any }) => void,
+    onToken: (token: string) => void,
+    onDone: (meta: ChatResponse) => void,
+    onError: (msg: string) => void,
+  ): AbortController {
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req),
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          onError(`HTTP ${response.status}: ${response.statusText}`);
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";   // keep incomplete last line
+
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const raw = line.slice(5).trim();
+            if (raw === "[DONE]") return;
+
+            try {
+              const event = JSON.parse(raw);
+              if (event.type === "routing") {
+                onRouting(event);
+              } else if (event.type === "token") {
+                onToken(event.content as string);
+              } else if (event.type === "metadata") {
+                onDone(event as unknown as ChatResponse);
+              } else if (event.type === "error") {
+                onError(event.message as string);
+              }
+            } catch {
+              // ignore malformed events
+            }
+          }
+        }
+      } catch (err: unknown) {
+        if ((err as { name?: string })?.name !== "AbortError") {
+          onError((err as Error)?.message ?? "Stream error");
+        }
+      }
+    })();
+
+    return controller;
+  }
+
+  async listSessions(): Promise<ChatSession[]> {
+    return this.request<ChatSession[]>("/chat/sessions");
   }
 
   async deleteSession(sessionId: string): Promise<{ session_id: string; message: string }> {
@@ -146,7 +231,7 @@ class ApiService {
   }
 
   // ── Resume Analyzer ──────────────────────────────────────────────────────────
-  async analyzeResume(resume: File, jd: File): Promise<Record<string, any>> {
+  async analyzeResume(resume: File, jd: File): Promise<ResumeAnalysisResponse> {
     const formData = new FormData();
     formData.append("resume", resume);
     formData.append("jd", jd);
@@ -169,16 +254,16 @@ class ApiService {
       throw new Error(errorMessage);
     }
 
-    return response.json() as Promise<Record<string, any>>;
+    return response.json() as Promise<ResumeAnalysisResponse>;
   }
 
   // ── Analytics ────────────────────────────────────────────────────────────────
-  async getAnalytics(): Promise<Record<string, any>> {
-    return this.request<Record<string, any>>("/analytics");
+  async getAnalytics(): Promise<AnalyticsResponse> {
+    return this.request<AnalyticsResponse>("/analytics");
   }
 
-  async getExtendedAnalytics(): Promise<Record<string, any>> {
-    return this.request<Record<string, any>>("/analytics/extended");
+  async getExtendedAnalytics(): Promise<ExtendedAnalyticsResponse> {
+    return this.request<ExtendedAnalyticsResponse>("/analytics/extended");
   }
 
   async getRetrievalMetrics(limit = 50): Promise<{ total_logged: number; returned: number; metrics: RetrievalMetric[] }> {

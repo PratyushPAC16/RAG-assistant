@@ -21,6 +21,7 @@ import {
   Globe,
   History,
   Workflow,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -197,21 +198,30 @@ export default function ObservabilityPanel() {
   };
 
   return (
-    <aside className="w-96 bg-zinc-950/60 border-l border-zinc-900/60 flex flex-col h-full overflow-hidden select-none backdrop-blur-md z-30 shrink-0 shadow-2xl">
+    <aside className="w-96 bg-[var(--glass-fill-chrome)] border-l border-[var(--glass-border)] flex flex-col h-full overflow-hidden select-none backdrop-filter backdrop-blur-[24px] saturate-[180%] z-30 shrink-0 shadow-2xl relative">
+      {/* Specular glass reflection line on left border */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-px pointer-events-none z-45"
+        style={{
+          background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.08) 15%, rgba(255,255,255,0.08) 85%, transparent)",
+        }}
+        aria-hidden
+      />
+
       {/* Observability Center Header */}
-      <div className="p-4 border-b border-zinc-900/60 flex items-center justify-between bg-zinc-950/20 shrink-0">
+      <div className="p-4 border-b border-[var(--glass-border-subtle)] flex items-center justify-between bg-zinc-950/15 shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
-          <Activity className="w-3.5 h-3.5 text-primary" />
+          <Activity className="w-3.5 h-3.5 text-primary animate-pulse" />
           Observability Center
         </span>
 
         <span className="flex items-center gap-1.5">
           <span
             className={cn("w-1.5 h-1.5 rounded-full shrink-0", {
-              "bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.5)]": generating,
-              "bg-violet-400 animate-pulse shadow-[0_0_8px_rgba(139,92,246,0.5)]": streaming,
-              "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]": traceError && !generating,
-              "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]": !generating && !streaming && !traceError,
+              "bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.6)]": generating,
+              "bg-violet-400 animate-pulse shadow-[0_0_8px_rgba(139,92,246,0.6)]": streaming,
+              "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]": traceError && !generating,
+              "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]": !generating && !streaming && !traceError,
             })}
           />
           <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">
@@ -224,17 +234,23 @@ export default function ObservabilityPanel() {
       <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
         {/* SECTION 1: Agent Workflow */}
         <div className="space-y-4">
-          <div className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 flex items-center gap-1.5 border-b border-zinc-900/60 pb-2">
+          <div className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 flex items-center gap-1.5 border-b border-[var(--glass-border-subtle)] pb-2">
             <Workflow className="w-3.5 h-3.5 text-primary" />
             <span>Agent Workflow</span>
             {!isLive && (
-              <span className="text-[8px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded font-mono font-normal tracking-normal uppercase ml-auto">
+              <span className="text-[8px] bg-zinc-900/60 border border-[var(--glass-border-subtle)] text-zinc-500 px-1.5 py-0.5 rounded-full font-mono font-normal tracking-normal uppercase ml-auto">
                 Demo Mode
               </span>
             )}
           </div>
           
-          <div className="space-y-3 px-1">
+          <div className="relative space-y-3.5 px-1 py-1">
+            {/* Vertical timeline track line */}
+            <div 
+              className="absolute left-[11px] top-4 bottom-4 w-[1px] pointer-events-none bg-zinc-800/80" 
+              aria-hidden
+            />
+
             {steps.map((step) => {
               const status = getStepStatus(step.key);
               const finalVal = getMatchedVal(step.key);
@@ -249,32 +265,33 @@ export default function ObservabilityPanel() {
                 <div
                   key={step.key}
                   className={cn(
-                    "flex items-center justify-between text-xs select-none transition-all duration-200",
-                    isActive ? "text-primary font-bold" : isDone ? "text-zinc-300" : "text-zinc-650"
+                    "flex items-center justify-between text-xs select-none transition-all duration-200 py-1 px-1.5 rounded-lg -mx-1.5 hover:bg-white/[0.015]",
+                    isActive ? "text-primary font-semibold" : isDone ? "text-zinc-200" : "text-zinc-650"
                   )}
                 >
-                  <div className="flex items-center gap-2 max-w-[65%]">
-                    <StepIcon
-                      className={cn("w-3.5 h-3.5 shrink-0", {
-                        "text-zinc-700": isPending,
-                        "text-primary animate-pulse": isActive,
-                        "text-emerald-400": isDone && step.key === "response",
-                        "text-zinc-500": isDone && step.key !== "response",
-                      })}
-                    />
+                  <div className="flex items-center gap-3.5 max-w-[65%] z-10">
+                    <div className={cn(
+                      "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all duration-300 backdrop-blur-md",
+                      isDone && step.key === "response" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.15)]" :
+                      isDone && step.key !== "response" ? "bg-zinc-900/60 border-zinc-800 text-zinc-400" :
+                      isActive ? "bg-[var(--glass-tint-primary)] border-primary text-primary shadow-[0_0_8px_rgba(139,92,246,0.3)] animate-pulse" :
+                      "bg-zinc-950 border-[var(--glass-border-subtle)] text-zinc-800"
+                    )}>
+                      <StepIcon className="w-2.5 h-2.5" />
+                    </div>
                     <span className="truncate">{step.label}</span>
                   </div>
 
-                  <div className="flex-1 border-b border-dotted border-zinc-800/80 mx-2 self-end mb-1" />
+                  <div className="flex-1 border-b border-dotted border-zinc-850/80 mx-2 self-end mb-1" />
 
                   <div className="shrink-0 font-mono text-[10px]">
                     {isActive ? (
-                      <span className="animate-pulse">{formatLatencyValue(timerVal)}</span>
+                      <span className="text-primary font-bold animate-pulse">{formatLatencyValue(timerVal)}</span>
                     ) : isDone && step.key !== "response" ? (
-                      <span>{formatLatencyValue(finalVal)}</span>
+                      <span className="text-zinc-400">{formatLatencyValue(finalVal)}</span>
                     ) : isDone && step.key === "response" ? (
-                      <span className="text-emerald-400 font-bold uppercase tracking-wider text-[8px] bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md">
-                        Success
+                      <span className="text-emerald-400 font-semibold uppercase tracking-widest text-[8px] bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded-full shadow-[0_0_6px_rgba(16,185,129,0.1)]">
+                        Done
                       </span>
                     ) : (
                       <span className="text-zinc-800">--</span>
@@ -288,12 +305,12 @@ export default function ObservabilityPanel() {
 
         {/* SECTION 2: Query Timeline */}
         <div className="space-y-4">
-          <div className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 flex items-center gap-1.5 border-b border-zinc-900/60 pb-2">
+          <div className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 flex items-center gap-1.5 border-b border-[var(--glass-border-subtle)] pb-2">
             <Clock className="w-3.5 h-3.5 text-primary" />
             <span>Query Timeline</span>
           </div>
           
-          <div className="bg-zinc-950/20 border border-zinc-900/40 rounded-xl p-3.5">
+          <div className="bg-[var(--glass-fill-inset)] border border-[var(--glass-border)] rounded-2xl p-4 shadow-inner backdrop-blur-md">
             <QueryTraceTimeline
               decision={decision}
               latency={latency}
@@ -311,11 +328,11 @@ export default function ObservabilityPanel() {
 
         {/* SECTION 3: Source Cards */}
         <div className="space-y-4">
-          <div className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 flex items-center gap-1.5 border-b border-zinc-900/60 pb-2">
+          <div className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 flex items-center gap-1.5 border-b border-[var(--glass-border-subtle)] pb-2">
             <FileText className="w-3.5 h-3.5 text-primary" />
             <span>Source Cards</span>
             {sources.length > 0 && (
-              <span className="text-[9px] bg-zinc-900 text-zinc-400 px-1.5 py-0.5 rounded-full border border-zinc-800 font-bold ml-auto animate-fade-in">
+              <span className="text-[9px] bg-zinc-900 border border-[var(--glass-border-subtle)] text-zinc-400 px-1.5 py-0.5 rounded-full font-bold ml-auto animate-fade-in">
                 {sources.length}
               </span>
             )}
@@ -323,8 +340,8 @@ export default function ObservabilityPanel() {
           
           <div className="space-y-3">
             {sources.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-center py-8 text-zinc-650 bg-zinc-950/10 border border-zinc-900/30 rounded-xl">
-                <FileText className="w-6 h-6 mb-1.5 text-zinc-800 animate-pulse" />
+              <div className="flex flex-col items-center justify-center text-center py-8 text-zinc-650 bg-zinc-950/10 border border-[var(--glass-border-subtle)] rounded-2xl">
+                <FileText className="w-6 h-6 mb-1.5 text-zinc-800/80 animate-pulse" />
                 <span className="text-xs font-semibold">No citations referenced</span>
                 <p className="text-[10px] text-zinc-700 mt-1 max-w-[80%] leading-relaxed">
                   Source documentation cards appear once vector or search queries complete.
@@ -338,17 +355,17 @@ export default function ObservabilityPanel() {
 
         {/* SECTION 4: Latency Metrics */}
         <div className="space-y-4">
-          <div className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 flex items-center gap-1.5 border-b border-zinc-900/60 pb-2">
+          <div className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 flex items-center gap-1.5 border-b border-[var(--glass-border-subtle)] pb-2">
             <Activity className="w-3.5 h-3.5 text-primary" />
             <span>Latency Metrics</span>
           </div>
           
           <div className="space-y-4">
             {/* Total Latency Split Meter */}
-            <div className="p-3.5 rounded-xl border border-zinc-900 bg-zinc-950/40 space-y-3">
+            <div className="p-4 rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-fill-inset)] space-y-3.5 backdrop-blur-md shadow-inner">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-semibold text-zinc-400">Pipeline Latency</span>
-                <span className="font-mono font-bold text-zinc-150 text-xs">
+                <span className="font-mono font-bold text-zinc-200 text-xs">
                   {generating ? (
                     <span className="animate-pulse text-primary font-bold">Measuring...</span>
                   ) : (
@@ -358,34 +375,34 @@ export default function ObservabilityPanel() {
               </div>
 
               {!generating && totLat > 0 && (
-                <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden flex shadow-inner">
+                <div className="w-full bg-zinc-950/80 border border-[var(--glass-border-subtle)] h-3 rounded-full overflow-hidden flex shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)] p-[1.5px] backdrop-blur-sm">
                   <div
-                    className="bg-blue-500 h-full hover:opacity-80 transition-opacity"
+                    className="bg-gradient-to-r from-blue-600 to-blue-400 h-full first:rounded-l-full last:rounded-r-full hover:brightness-110 transition-all cursor-help"
                     style={{ width: `${(routerLat / totLat) * 100}%` }}
                     title={`Router: ${routerLat.toFixed(0)}ms`}
                   />
                   <div
-                    className="bg-emerald-500 h-full hover:opacity-80 transition-opacity"
+                    className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full first:rounded-l-full last:rounded-r-full hover:brightness-110 transition-all cursor-help"
                     style={{ width: `${(memoryLat / totLat) * 100}%` }}
                     title={`Memory: ${memoryLat.toFixed(0)}ms`}
                   />
                   <div
-                    className="bg-cyan-500 h-full hover:opacity-80 transition-opacity"
+                    className="bg-gradient-to-r from-cyan-600 to-cyan-400 h-full first:rounded-l-full last:rounded-r-full hover:brightness-110 transition-all cursor-help"
                     style={{ width: `${(vectorLat / totLat) * 100}%` }}
                     title={`Semantic Search: ${vectorLat.toFixed(0)}ms`}
                   />
                   <div
-                    className="bg-amber-500 h-full hover:opacity-80 transition-opacity"
+                    className="bg-gradient-to-r from-amber-600 to-amber-400 h-full first:rounded-l-full last:rounded-r-full hover:brightness-110 transition-all cursor-help"
                     style={{ width: `${(bm25Lat / totLat) * 100}%` }}
                     title={`BM25 Search: ${bm25Lat.toFixed(0)}ms`}
                   />
                   <div
-                    className="bg-indigo-500 h-full hover:opacity-80 transition-opacity"
+                    className="bg-gradient-to-r from-indigo-600 to-indigo-400 h-full first:rounded-l-full last:rounded-r-full hover:brightness-110 transition-all cursor-help"
                     style={{ width: `${(rerankLat / totLat) * 100}%` }}
                     title={`Reranking: ${rerankLat.toFixed(0)}ms`}
                   />
                   <div
-                    className="bg-violet-500 h-full hover:opacity-80 transition-opacity"
+                    className="bg-gradient-to-r from-violet-600 to-violet-400 h-full first:rounded-l-full last:rounded-r-full hover:brightness-110 transition-all cursor-help"
                     style={{ width: `${(synthesisLat / totLat) * 100}%` }}
                     title={`LLM Synthesis: ${synthesisLat.toFixed(0)}ms`}
                   />
@@ -394,29 +411,29 @@ export default function ObservabilityPanel() {
 
               {/* Legend Grid */}
               {!generating && totLat > 0 && (
-                <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 pt-1 text-[8px] font-mono text-zinc-500 uppercase tracking-tight">
+                <div className="grid grid-cols-3 gap-x-2 gap-y-2 pt-1 text-[8px] font-mono text-zinc-500 uppercase tracking-wider">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_#3b82f6]" />
                     <span>Router</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
                     <span>Memory</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_6px_#06b6d4]" />
                     <span>Semantic</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_6px_#f59e0b]" />
                     <span>BM25</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_6px_#6366f1]" />
                     <span>Rerank</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shadow-[0_0_6px_#8b5cf6]" />
                     <span>LLM</span>
                   </div>
                 </div>
@@ -424,10 +441,10 @@ export default function ObservabilityPanel() {
             </div>
 
             {/* Diagnostics details dropdown */}
-            <div className="border border-zinc-900 rounded-xl bg-zinc-950/20">
+            <div className="border border-[var(--glass-border)] rounded-2xl bg-[var(--glass-fill-inset)] overflow-hidden backdrop-blur-md shadow-inner">
               <button
                 onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}
-                className="w-full flex items-center justify-between text-[9px] font-bold text-zinc-500 hover:text-zinc-400 uppercase tracking-widest px-3.5 py-2.5 transition-colors border-b border-zinc-900/50"
+                className="w-full flex items-center justify-between text-[9px] font-bold text-zinc-500 hover:text-zinc-400 uppercase tracking-widest px-4 py-3 transition-colors border-b border-[var(--glass-border-subtle)]"
               >
                 <span>Diagnostics Table</span>
                 {isDiagnosticsOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -441,42 +458,41 @@ export default function ObservabilityPanel() {
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="p-3.5 text-[9px] space-y-2.5 text-zinc-500 font-mono select-text">
-                      <div className="flex justify-between items-center border-b border-zinc-900/40 pb-1.5">
-                        <span>LLM Model Provider</span>
+                    <div className="p-4 text-[9px] space-y-2.5 text-zinc-500 font-mono select-text bg-white/[0.005]">
+                      <div className="flex justify-between items-center border-b border-[var(--glass-border-subtle)] pb-2">
+                        <span className="flex items-center gap-1.5"><Globe className="w-3 h-3 text-zinc-700" />LLM Provider</span>
                         <span className="text-zinc-350 font-bold uppercase">{activeProvider}</span>
                       </div>
                       {health?.llm_model && (
-                        <div className="flex justify-between items-center border-b border-zinc-900/40 pb-1.5">
-                          <span>Model Identity</span>
+                        <div className="flex justify-between items-center border-b border-[var(--glass-border-subtle)] pb-2">
+                          <span className="flex items-center gap-1.5"><Cpu className="w-3 h-3 text-zinc-700" />Model Identity</span>
                           <span className="text-zinc-350 font-bold truncate max-w-[120px]" title={health.llm_model}>
                             {health.llm_model.split("/").pop()}
                           </span>
                         </div>
                       )}
                       {health?.vector_store && (
-                        <div className="flex justify-between items-center border-b border-zinc-900/40 pb-1.5">
-                          <span>Vector Database</span>
+                        <div className="flex justify-between items-center border-b border-[var(--glass-border-subtle)] pb-2">
+                          <span className="flex items-center gap-1.5"><Database className="w-3 h-3 text-zinc-700" />Vector Database</span>
                           <span className="text-zinc-350 font-bold uppercase">{health.vector_store}</span>
                         </div>
                       )}
-                      <div className="flex justify-between items-center border-b border-zinc-900/40 pb-1.5">
-                        <span>Retrieved Memories</span>
+                      <div className="flex justify-between items-center border-b border-[var(--glass-border-subtle)] pb-2">
+                        <span className="flex items-center gap-1.5"><History className="w-3 h-3 text-zinc-700" />Retrieved Memories</span>
                         <span className="text-zinc-350 font-bold">{memories.length} facts</span>
                       </div>
-                      <div className="flex justify-between items-center border-b border-zinc-900/40 pb-1.5">
-                        <span>Cited References</span>
+                      <div className="flex justify-between items-center border-b border-[var(--glass-border-subtle)] pb-2">
+                        <span className="flex items-center gap-1.5"><FileText className="w-3 h-3 text-zinc-700" />Cited References</span>
                         <span className="text-zinc-350 font-bold">{sources.length} sources</span>
                       </div>
-                      <div className="flex justify-between items-center border-b border-zinc-900/40 pb-1.5">
-                        <span>Total Token Size</span>
+                      <div className="flex justify-between items-center border-b border-[var(--glass-border-subtle)] pb-2">
+                        <span className="flex items-center gap-1.5"><Coins className="w-3 h-3 text-zinc-700" />Total Token Size</span>
                         <span className="text-zinc-350 font-bold flex items-center gap-1">
-                          <Coins className="w-2.5 h-2.5 text-zinc-700" />
                           {tokens?.total ?? 0} tokens
                         </span>
                       </div>
                       <div className="flex justify-between items-center pb-0.5">
-                        <span>Est API Fee</span>
+                        <span className="flex items-center gap-1.5"><Bot className="w-3 h-3 text-emerald-900/50" />Est API Fee</span>
                         <span className="text-emerald-500 font-bold">
                           ${tokens?.cost ? tokens.cost.toFixed(5) : "0.00000"}
                         </span>

@@ -46,11 +46,15 @@ export interface RetrievedChunk {
 }
 
 export interface SourceCitation {
-  document: string;
+  document?: string;   // optional — backend may omit for preview sources
   page?: number;
   chunk_id?: string;
   relevance_score?: number;
   text?: string;
+  // aliases used by some endpoints
+  name?: string;
+  score?: number;
+  confidence?: number;
 }
 
 // ── Chat & Memory ─────────────────────────────────────────────────────────────
@@ -296,4 +300,84 @@ export interface WorkflowExecutionResult {
   total_duration_ms: number;
   started_at: string;
   completed_at?: string;
+}
+// ── Chat Session ─────────────────────────────────────────────────────────────
+
+export interface ChatSession {
+  session_id: string;
+  title?: string;
+  message_count?: number;
+  last_updated?: string;
+}
+
+// ── Analytics Response Shapes ─────────────────────────────────────────────────
+
+/** Shape returned by GET /analytics */
+export interface AnalyticsResponse {
+  total_queries: number;
+  queries_today: number;
+  avg_total_latency_ms: number;
+  avg_retrieval_latency_ms: number;
+  avg_vector_search_ms: number;
+  avg_bm25_search_ms: number;
+  avg_rrf_fusion_ms: number;
+  avg_reranking_ms: number;
+  avg_llm_ms: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  avg_prompt_tokens: number;
+  avg_completion_tokens: number;
+  avg_total_tokens: number;
+  avg_cost_usd: number;
+  avg_vector_hits: number;
+  avg_bm25_hits: number;
+  avg_retrieved: number;
+  avg_reranked: number;
+  agent_distribution: Record<string, number>;
+  top_sources: [string, number][];
+  document_chunk_distribution: Record<string, number>;
+  recent_metrics: RetrievalMetric[];
+  daily_trend: { date: string; queries: number; cost: number }[];
+  // optional provider field
+  llm_provider?: string;
+}
+
+/** Shape returned by GET /analytics/extended */
+export interface ExtendedAnalyticsResponse extends AnalyticsResponse {
+  provider_usage: Record<string, number>;
+  most_used_agent: string;
+  avg_retrieval_ms: number;
+  p95_total_latency_ms: number;
+  retrieval_success_rate: number;
+  avg_chunks_retrieved: number;
+  avg_chunks_reranked: number;
+  avg_query_length: number;
+  max_query_length: number;
+  min_query_length: number;
+  query_length_distribution: Record<string, number>;
+  hourly_query_counts: { hour: number; count: number }[];
+  memory_metrics?: Record<string, unknown>;
+  document_metrics?: {
+    total_documents: number;
+    total_chunks_indexed: number;
+    file_type_distribution: Record<string, number>;
+  };
+}
+
+/** Shape returned by POST /analyze-resume */
+export interface ResumeAnalysisResponse {
+  overall_match_score: number;
+  ats_score: number;
+  skills_match: { matched: string[]; missing: string[]; score: number };
+  experience_match: { score: number; summary: string };
+  education_match: { score: number; summary: string };
+  projects_match: { score: number; summary: string };
+  interview_readiness: number;
+  strengths: string[];
+  improvement_areas: string[];
+  roadmap: string[];
+  keyword_density: Record<string, number>;
+  [key: string]: unknown;  // backend may add extra fields
 }

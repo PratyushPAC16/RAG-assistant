@@ -55,19 +55,42 @@ function RAGPipelineNode({ data }: { data: NodeData }) {
   const isSuccess = data.isCompleted;
   const isActive = data.isActive;
 
+  // Extract the color name from colorClass (e.g. "text-blue-400 ..." → "blue")
+  const accentColorMap: Record<string, string> = {
+    blue:    "rgba(96,165,250,0.75)",
+    emerald: "rgba(52,211,153,0.75)",
+    amber:   "rgba(251,191,36,0.75)",
+    cyan:    "rgba(34,211,238,0.75)",
+    indigo:  "rgba(129,140,248,0.75)",
+    violet:  "rgba(167,139,250,0.75)",
+  };
+  const colorKey = Object.keys(accentColorMap).find((k) =>
+    data.colorClass.includes(k)
+  ) ?? "blue";
+  const accentColor = accentColorMap[colorKey];
+
   return (
     <div
       className={cn(
-        "w-44 p-4 rounded-xl border flex flex-col items-center text-center transition-all duration-300 relative bg-zinc-950/80 backdrop-blur-md",
+        "w-44 p-4 rounded-xl flex flex-col items-center text-center transition-all duration-300 relative glass-card",
         isActive
           ? "border-primary shadow-[0_0_20px_rgba(139,92,246,0.3)] ring-1 ring-primary/45 scale-105"
           : isSuccess
           ? "border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
-          : "border-zinc-850 hover:border-zinc-750"
+          : "hover:border-zinc-750"
       )}
     >
       <Handle type="target" position={Position.Left} className="w-1.5 h-1.5 bg-zinc-800 border-zinc-900 !left-[-4px]" />
       <Handle type="source" position={Position.Right} className="w-1.5 h-1.5 bg-zinc-800 border-zinc-900 !right-[-4px]" />
+
+      {/* Colored left-edge accent strip — matches dashboard recentActivity color per agent type */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl pointer-events-none"
+        style={{
+          background: `linear-gradient(to bottom, ${accentColor}, ${accentColor.replace("0.75", "0.30")})`,
+        }}
+        aria-hidden
+      />
 
       {/* Glow highlight top line */}
       {isActive && (
@@ -401,7 +424,6 @@ export default function ArchitecturePage() {
               className="!bg-zinc-950/80 !border-zinc-850/60 !rounded-lg overflow-hidden shrink-0 hidden md:block"
               nodeColor={() => "#18181b"}
               maskColor="rgba(0,0,0,0.5)"
-              strokeColor="#27272a"
               style={{ width: 100, height: 75 }}
             />
           </ReactFlow>

@@ -113,6 +113,7 @@ A **vector database** stores those number-lists (vectors) and lets you search th
 
 Think of it like a regular database, but instead of searching by exact text match (`WHERE name = "John"`), you search by mathematical similarity ("Find me the 10 vectors closest to this query vector").
 
+
 ### ChromaDB
 
 This project uses **ChromaDB** — a lightweight, local vector database that:

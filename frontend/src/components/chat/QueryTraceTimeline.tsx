@@ -356,8 +356,8 @@ export default function QueryTraceTimeline({
     <div className="space-y-4 select-none">
       {/* Real-time latency ticker header when loading */}
       {isGenerating && (
-        <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-950/40 border border-zinc-850/60 font-mono text-[10px] text-zinc-400">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/50 border border-[var(--glass-border-subtle)] font-mono text-[10px] text-zinc-400 shadow-inner">
+          <div className="flex items-center gap-2">
             <Clock className="w-3.5 h-3.5 text-primary animate-spin" />
             <span>Tracing Pipeline Activity...</span>
           </div>
@@ -366,7 +366,7 @@ export default function QueryTraceTimeline({
       )}
 
       {/* Chronological Vertical Timeline wrapper */}
-      <div className="relative pl-7 space-y-6 border-l border-zinc-850/60 ml-3 py-1">
+      <div className="relative pl-7 space-y-6 border-l border-zinc-800/60 ml-3 py-1">
         {events.map((event, index) => {
           const isExpanded = expandedIndex === index;
           const EventIcon = event.icon;
@@ -382,11 +382,11 @@ export default function QueryTraceTimeline({
               <div
                 onClick={() => setExpandedIndex(isExpanded ? null : index)}
                 className={cn(
-                  "absolute -left-[37px] w-5 h-5 rounded-full border bg-zinc-950 flex items-center justify-center cursor-pointer transition-all duration-300 z-10",
-                  isSuccess && "border-emerald-500/30 text-emerald-400 hover:border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.1)]",
-                  isError && "border-rose-500/40 text-rose-450 hover:border-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.15)] animate-shake",
-                  isInfo && "border-zinc-800 text-zinc-500 hover:border-zinc-700",
-                  isRunning && "border-primary/50 text-primary hover:border-primary shadow-[0_0_8px_rgba(139,92,246,0.2)] animate-pulse"
+                  "absolute -left-[37px] w-5 h-5 rounded-full border flex items-center justify-center cursor-pointer transition-all duration-300 z-10 backdrop-blur-md",
+                  isSuccess && "bg-emerald-500/10 border-emerald-500/35 text-emerald-400 hover:border-emerald-400 hover:scale-105 shadow-[0_0_8px_rgba(16,185,129,0.15)]",
+                  isError && "bg-rose-500/10 border-rose-500/35 text-rose-450 hover:border-rose-400 hover:scale-105 shadow-[0_0_8px_rgba(244,63,94,0.2)] animate-shake",
+                  isInfo && "bg-zinc-950 border-[var(--glass-border-subtle)] text-zinc-600 hover:border-zinc-550 hover:scale-105",
+                  isRunning && "bg-[var(--glass-tint-primary)] border-primary text-primary hover:border-primary-foreground hover:scale-105 shadow-[0_0_10px_rgba(139,92,246,0.3)] animate-pulse"
                 )}
               >
                 <EventIcon className={cn("w-2.5 h-2.5", isRunning && "animate-pulse")} />
@@ -396,20 +396,20 @@ export default function QueryTraceTimeline({
               <div className="space-y-1">
                 {/* Meta header (time & duration) */}
                 <div className="flex justify-between items-baseline text-[9px] font-mono">
-                  <span className="text-zinc-500 flex items-center gap-1">
+                  <span className="text-zinc-500 flex items-center gap-1.5">
                     <Clock className="w-2.5 h-2.5 text-zinc-700" />
                     {event.timestamp}
                   </span>
                   <div className="flex items-center gap-2">
                     {event.duration && (
-                      <span className="text-zinc-450 bg-zinc-900 px-1.5 py-0.5 rounded">
+                      <span className="text-zinc-450 bg-zinc-900 border border-[var(--glass-border-subtle)] px-1.5 py-0.5 rounded-full text-[8px] font-bold">
                         {event.duration}
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={() => setExpandedIndex(isExpanded ? null : index)}
-                      className="text-zinc-500 hover:text-zinc-350 flex items-center gap-0.5 transition-colors"
+                      className="text-zinc-550 hover:text-zinc-350 flex items-center gap-0.5 transition-colors"
                     >
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </button>
@@ -423,7 +423,7 @@ export default function QueryTraceTimeline({
                     "cursor-pointer text-xs font-bold transition-colors",
                     isSuccess && "text-zinc-200 group-hover:text-zinc-100",
                     isError && "text-rose-400 group-hover:text-rose-350",
-                    isInfo && "text-zinc-500 group-hover:text-zinc-400",
+                    isInfo && "text-zinc-500 group-hover:text-zinc-450",
                     isRunning && "text-primary group-hover:text-primary-foreground"
                   )}
                 >
@@ -445,7 +445,7 @@ export default function QueryTraceTimeline({
                       transition={{ duration: 0.2, ease: "easeInOut" }}
                       className="overflow-hidden"
                     >
-                      <div className="mt-2 p-2.5 rounded-lg bg-zinc-950 border border-zinc-900 font-mono text-[9px] text-zinc-500 space-y-1.5 select-text">
+                      <div className="mt-2.5 p-3 rounded-xl bg-zinc-950/60 border border-[var(--glass-border-subtle)] font-mono text-[9px] text-zinc-500 space-y-2 select-text shadow-inner">
                         {Object.entries(event.details).map(([key, val]) => {
                           const isCost = key.toLowerCase().includes("cost");
                           const isTokens = key.toLowerCase().includes("token");
@@ -453,9 +453,9 @@ export default function QueryTraceTimeline({
                           return (
                             <div
                               key={key}
-                              className="flex justify-between items-center border-b border-zinc-900 pb-1.5 last:border-0 last:pb-0"
+                              className="flex justify-between items-center border-b border-zinc-900/40 pb-2 last:border-0 last:pb-0"
                             >
-                              <span className="capitalize text-zinc-550 flex items-center gap-1">
+                              <span className="capitalize text-zinc-550 flex items-center gap-1.5">
                                 {isTokens && <Coins className="w-3 h-3 text-zinc-650" />}
                                 {key}
                               </span>

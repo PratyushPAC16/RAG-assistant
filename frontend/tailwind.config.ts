@@ -62,6 +62,20 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"SF Pro Text"',
+          '"SF Pro Display"',
+          '"SF Pro Icons"',
+          '"Helvetica Neue"',
+          "Helvetica",
+          "Arial",
+          "var(--font-sans)",
+          "sans-serif",
+        ],
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

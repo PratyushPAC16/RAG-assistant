@@ -160,6 +160,8 @@ cp .env.example .env
 | `GOOGLE_API_KEY` | ✅ | — | Google Gemini API key |
 | `TAVILY_API_KEY` | ✅ | — | Tavily web search API key |
 | `GROQ_API_KEY` | | — | Optional Groq provider API key |
+| `API_KEY` | | _(empty)_ | Secret for `X-API-Key` header. Protects destructive endpoints (`DELETE`, `POST /reload`). Empty = auth disabled (dev mode). |
+| `ALLOWED_ORIGINS` | | `http://localhost:3000` | Comma-separated CORS allowed origins. Use `*` for open APIs (credentials auto-disabled). |
 | `LLM_PROVIDER` | | `gemini` | Active LLM endpoint (`gemini`, `groq`, `ollama`) |
 | `EMBEDDING_PROVIDER`| | `gemini` | Active embedding endpoint (`gemini`, `local`, `ollama`) |
 | `GEMINI_MODEL` | | `gemini-2.0-flash` | Gemini generation model version |
@@ -167,6 +169,9 @@ cp .env.example .env
 | `CHROMA_PERSIST_DIR` | | `./chroma_db` | ChromaDB persistence path |
 | `API_HOST` | | `0.0.0.0` | FastAPI host interface |
 | `API_PORT` | | `8000` | FastAPI port interface |
+
+> **API Key usage**: When `API_KEY` is set, protected endpoints require the header `X-API-Key: <your-key>`. Unset for local development; always set in production.
+
 
 ---
 

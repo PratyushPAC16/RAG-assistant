@@ -135,9 +135,18 @@ class Settings(BaseSettings):
     api_version: str = Field(default="1.0.0", description="API version string")
     # Comma-separated list of allowed CORS origins, or "*" for wildcard.
     # Example: "http://localhost:3000,https://myapp.example.com"
+    # Default is localhost:3000; set ALLOWED_ORIGINS=* only for open public APIs
+    # that do NOT rely on cookies/credentials.
     allowed_origins: str = Field(
-        default="*",
-        description="Comma-separated CORS allowed origins. Use '*' for wildcard (dev only).",
+        default="http://localhost:3000",
+        description="Comma-separated CORS allowed origins. Use '*' for wildcard (no credentials).",
+    )
+    # ── API Authentication ─────────────────────────────────────────────────────
+    # Set API_KEY to a secret string to protect destructive endpoints.
+    # Leave empty (default) to disable auth — useful for local development.
+    api_key: str = Field(
+        default="",
+        description="Secret key for X-API-Key header auth. Empty = auth disabled (dev mode).",
     )
     # Maximum allowed upload file size in megabytes
     max_upload_size_mb: int = Field(

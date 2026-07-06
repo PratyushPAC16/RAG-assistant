@@ -93,7 +93,7 @@ export default function Dashboard() {
   // Derive new telemetry stats
   const retrievalSuccess = analytics?.retrieval_success_rate ?? 95;
   const citationCoverage = totalQueries > 0 ? 84 : 0;
-  const memoryUtilization = analytics?.memory_metrics?.total_memories ? Math.min(100, Math.round((analytics.memory_metrics.total_memories / 500) * 100)) : 12;
+  const memoryUtilization = analytics?.memory_metrics?.total_memories ? Math.min(100, Math.round((Number(analytics.memory_metrics.total_memories) / 500) * 100)) : 12;
 
   const kpis = [
     {
@@ -149,12 +149,12 @@ export default function Dashboard() {
         {kpis.map((kpi, idx) => {
           const Icon = kpi.icon;
           return (
-            <Card key={idx} className="glass-panel border-zinc-800/40 animate-fade-in" glass>
+            <Card key={idx} className="glass-panel border-zinc-800/40 animate-fade-in hover:scale-[1.01] transition-transform duration-300" glass>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                   {kpi.title}
                 </CardTitle>
-                <div className={`p-1.5 rounded-lg border ${kpi.color}`}>
+                <div className={`p-1.5 rounded-xl border shadow-[0_0_12px_-2px_currentColor] ${kpi.color}`}>
                   <Icon className="w-4 h-4" />
                 </div>
               </CardHeader>

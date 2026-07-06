@@ -110,10 +110,10 @@ export default function SourceCards({ sources, hideHeader = false }: SourceCards
               key={idx}
               onClick={() => setExpandedIndex(isExpanded ? null : idx)}
               className={cn(
-                "group relative rounded-xl border pl-4 pr-3.5 py-3.5 transition-all duration-300 cursor-pointer select-none overflow-hidden backdrop-blur-md",
+                "group relative rounded-2xl border pl-4 pr-3.5 py-3.5 transition-all duration-300 cursor-pointer select-none overflow-hidden backdrop-blur-md",
                 isExpanded
-                  ? "bg-zinc-900/90 border-zinc-700/80 shadow-lg shadow-zinc-950/50"
-                  : "bg-zinc-900/40 border-zinc-850/60 hover:bg-zinc-900/60 hover:border-zinc-850 hover:shadow-md"
+                  ? "bg-[var(--glass-fill-elevated)] border-[var(--glass-border)] shadow-xl shadow-zinc-950/40"
+                  : "bg-[var(--glass-fill-inset)] border-[var(--glass-border-subtle)] hover:bg-white/[0.015] hover:border-[var(--glass-border)] hover:shadow-md"
               )}
             >
               {/* Vertical Color Indicator Line */}
@@ -125,28 +125,28 @@ export default function SourceCards({ sources, hideHeader = false }: SourceCards
               {/* Card Header */}
               <div className="flex items-start justify-between gap-2.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7.5 h-7.5 rounded-lg bg-zinc-950 border border-zinc-850 flex items-center justify-center shrink-0 shadow-inner">
+                  <div className="w-8 h-8 rounded-xl bg-zinc-950 border border-[var(--glass-border-subtle)] flex items-center justify-center shrink-0 shadow-inner">
                     <FileText className="w-3.5 h-3.5 text-primary group-hover:scale-105 transition-transform duration-200" />
                   </div>
                   <div className="min-w-0">
                     <div
                       className="text-xs font-bold text-zinc-200 truncate group-hover:text-zinc-100 transition-colors"
-                      title={src.document}
+                      title={src.document ?? src.name ?? ""}
                     >
-                      {cleanDocName(src.document)}
+                      {cleanDocName(src.document ?? src.name ?? "")}
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-zinc-500 font-mono">
                       {src.page !== undefined && src.page !== null && (
-                        <span className="bg-zinc-950/40 border border-zinc-900 px-1 py-0.5 rounded text-zinc-400">
+                        <span className="bg-zinc-950/40 border border-[var(--glass-border-subtle)] px-1.5 py-0.5 rounded text-zinc-400">
                           Page {src.page}
                         </span>
                       )}
                       {src.chunk_id && (
                         <span
-                          className="flex items-center gap-0.5 bg-zinc-950/40 border border-zinc-900 px-1 py-0.5 rounded text-zinc-400 max-w-[90px] truncate"
+                          className="flex items-center gap-0.5 bg-zinc-950/40 border border-[var(--glass-border-subtle)] px-1.5 py-0.5 rounded text-zinc-400 max-w-[90px] truncate"
                           title={src.chunk_id}
                         >
-                          <Hash className="w-2 h-2 text-zinc-600 shrink-0" />
+                          <Hash className="w-2 h-2 text-zinc-700 shrink-0" />
                           {src.chunk_id.replace("chunk_", "")}
                         </span>
                       )}
@@ -177,7 +177,7 @@ export default function SourceCards({ sources, hideHeader = false }: SourceCards
               </div>
 
               {/* Expand Details Trigger */}
-              <div className="mt-3 flex items-center justify-between border-t border-zinc-900/50 pt-2.5">
+              <div className="mt-3 flex items-center justify-between border-t border-[var(--glass-border-subtle)] pt-2.5">
                 <button
                   type="button"
                   className="text-[10px] text-zinc-550 group-hover:text-zinc-350 flex items-center gap-1 font-bold uppercase tracking-wider transition-colors"
@@ -199,7 +199,7 @@ export default function SourceCards({ sources, hideHeader = false }: SourceCards
                   <button
                     type="button"
                     onClick={(e) => handleCopy(previewText, idx, e)}
-                    className="px-2 py-0.5 hover:bg-zinc-900 border border-zinc-850 hover:border-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-all z-20 flex items-center gap-1 shrink-0"
+                    className="px-2 py-0.5 hover:bg-zinc-900 border border-zinc-850/60 hover:border-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-all z-20 flex items-center gap-1 shrink-0"
                     title="Copy Full Chunk Content"
                   >
                     {copiedIndex === idx ? (
@@ -225,10 +225,10 @@ export default function SourceCards({ sources, hideHeader = false }: SourceCards
                     animate={{ height: "auto", opacity: 1, marginTop: 12 }}
                     exit={{ height: 0, opacity: 0, marginTop: 0 }}
                     transition={{ duration: 0.25, ease: "easeInOut" }}
-                    className="overflow-hidden border-t border-zinc-850/60 pt-3"
+                    className="overflow-hidden border-t border-[var(--glass-border-subtle)] pt-3"
                   >
                     <div
-                      className="rounded-lg bg-zinc-950/80 border border-zinc-900/60 p-3 max-h-48 overflow-y-auto font-mono text-[10px] text-zinc-350 leading-relaxed select-text select-all custom-scrollbar cursor-text"
+                      className="rounded-2xl bg-zinc-950 border border-[var(--glass-border-subtle)] p-3 max-h-48 overflow-y-auto font-mono text-[10px] text-zinc-300 leading-relaxed select-text select-all custom-scrollbar cursor-text shadow-inner"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {previewText}

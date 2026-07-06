@@ -492,18 +492,19 @@ export default function ChatPage() {
         )}
 
         {/* Message bubble stream */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6">
-          {messages.length === 0 && !isGenerating ? (
-            <div className="min-h-full flex flex-col justify-center items-center text-center p-6 relative py-12">
-              {/* Glow background */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-violet-600/5 rounded-full blur-3xl pointer-events-none" />
-              
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-                className="flex flex-col items-center max-w-2xl w-full"
-              >
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-3xl mx-auto w-full min-h-full flex flex-col justify-between">
+            {messages.length === 0 && !isGenerating ? (
+              <div className="flex-1 flex flex-col justify-center items-center text-center relative py-12">
+                {/* Glow background */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-violet-600/5 rounded-full blur-3xl pointer-events-none" />
+                
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4 }}
+                  className="flex flex-col items-center w-full"
+                >
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/15 mb-4 animate-float">
                   <Sparkles className="w-6 h-6 text-zinc-100" />
                 </div>
@@ -606,7 +607,7 @@ export default function ChatPage() {
               </motion.div>
             </div>
           ) : (
-            <div className="space-y-6 max-w-3xl mx-auto">
+            <div className="space-y-6 w-full pb-6">
               <AnimatePresence initial={false}>
                 {messages.map((msg, idx) => {
                   const isUser = msg.role === "user";
@@ -715,48 +716,54 @@ export default function ChatPage() {
               )}
             </div>
           )}
+          </div>
         </div>
 
-        {/* Input */}
-        <footer className="p-6 shrink-0 bg-gradient-to-t from-zinc-950/80 to-transparent">
-          <form onSubmit={handleSend} className="max-w-3xl mx-auto relative flex gap-3">
-            <Link href="/documents" className="shrink-0 self-end">
+        {/* Floating Pill Input Bar — macOS Music player bar style */}
+        <footer className="px-6 pb-6 pt-2 shrink-0">
+          <form
+            onSubmit={handleSend}
+            className="glass-pill w-full max-w-3xl mx-auto flex items-center gap-2 px-4 py-2"
+          >
+            {/* Attach / upload icon button */}
+            <Link href="/documents" className="shrink-0">
               <Button
                 type="button"
                 variant="outline"
-                className="h-[46px] rounded-xl border-zinc-850/65 bg-zinc-900/40 text-xs font-semibold hover:bg-zinc-850 hover:text-zinc-250 flex items-center gap-2 px-3.5 shadow-sm"
+                size="icon"
+                className="w-8 h-8 rounded-full border-transparent bg-transparent hover:bg-white/5 hover:border-white/10 text-zinc-400 hover:text-primary transition-all duration-200 shrink-0"
                 title="Upload and Index Documents"
               >
-                <Plus className="w-4 h-4 text-primary" />
-                <span className="hidden sm:inline">Upload Document</span>
+                <Plus className="w-4 h-4" />
               </Button>
             </Link>
 
-            <div className="flex-1 relative">
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Query documents database or ask follow-up questions..."
-                disabled={isGenerating || isStreaming}
-                className="w-full bg-zinc-900/60 dark:bg-zinc-950/60 border border-zinc-850/65 focus:border-primary/60 rounded-xl pl-4 pr-16 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-inner resize-none overflow-hidden max-h-32 text-zinc-200 placeholder-zinc-550 backdrop-blur-md"
-                style={{ height: "46px" }}
-              />
-              
-              <div className="absolute right-3.5 bottom-2 flex items-center gap-1.5">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="icon"
-                  disabled={!input.trim() || isGenerating || isStreaming}
-                  className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
+            {/* Pill divider */}
+            <div className="w-px h-5 bg-white/10 shrink-0" />
+
+            {/* Textarea — transparent, fills the pill */}
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Query documents database or ask follow-up questions..."
+              disabled={isGenerating || isStreaming}
+              className="flex-1 bg-transparent border-0 outline-none resize-none overflow-hidden max-h-32 text-sm text-zinc-200 placeholder-zinc-550 py-1.5 focus:ring-0"
+              style={{ height: "36px" }}
+            />
+
+            {/* Send button */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="icon"
+              disabled={!input.trim() || isGenerating || isStreaming}
+              className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center transition-all duration-200"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </Button>
           </form>
           <div className="text-center text-[10px] text-zinc-650 mt-2 select-none font-medium">
             RAG Orchestrator coordinates Router, Memory and Retrieval sub-agents.

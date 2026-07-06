@@ -1,12 +1,16 @@
 import { create } from "zustand";
 import { api } from "@/services/api";
-import { ChatMessage, RoutingDecision, SourceCitation, MemoryRecord, AgentType } from "@/types";
+import { ChatMessage, RoutingDecision, SourceCitation, MemoryRecord, AgentType, ChatSession } from "@/types";
 
-interface ChatSession {
-  session_id: string;
-  title?: string;
-  message_count?: number;
-  last_updated?: string;
+// Module-level guard: tracks any active fake-typing interval so it can be
+// cancelled before a new message or session switch begins.
+let _typingIntervalId: ReturnType<typeof setInterval> | null = null;
+
+function cancelTypingInterval() {
+  if (_typingIntervalId !== null) {
+    clearInterval(_typingIntervalId);
+    _typingIntervalId = null;
+  }
 }
 
 interface ChatState {
@@ -58,17 +62,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const sessions = await api.listSessions();
       set({ sessions });
-    } catch (err: any) {
-      console.error("Failed to load chat sessions:", err);
+    } catch (err: unknown) {
+      console.error("Failed to load chat sessions:", err instanceof Error ? err.message : String(err));
     }
   },
 
   selectSession: async (sessionId) => {
+    cancelTypingInterval();
     set({ activeSessionId: sessionId, isGenerating: true, error: null });
     get().clearMetadata();
     try {
       const res = await api.exportSession(sessionId, "json");
-      const messages = (res.messages || []).map((msg: any) => ({
+      const messages = (res.messages || []).map((msg: ChatMessage) => ({
         role: msg.role,
         content: msg.content,
         timestamp: msg.timestamp || new Date().toISOString(),
@@ -76,8 +81,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         metadata: msg.metadata || {},
       }));
       set({ messages, isGenerating: false });
-    } catch (err: any) {
-      set({ error: err.message, isGenerating: false });
+    } catch (err: unknown) {
+      set({
+        error: err instanceof Error ? err.message : String(err),
+        isGenerating: false,
+      });
     }
   },
 
@@ -89,12 +97,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (isDeletingActive) {
         get().createNewSession();
       }
-    } catch (err: any) {
-      console.error("Failed to delete chat session:", err);
+    } catch (err: unknown) {
+      console.error("Failed to delete chat session:", err instanceof Error ? err.message : String(err));
     }
   },
 
   createNewSession: () => {
+    cancelTypingInterval();
     set({
       activeSessionId: null,
       messages: [],
@@ -105,9 +114,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage: async (query, useWebSearch, filterDocumentIds) => {
     if (!query.trim()) return;
+    cancelTypingInterval(); // cancel any stale typing animation before starting
 
     let sessionId = get().activeSessionId;
-    // Generate a temp session ID if none active
     const isNewSession = !sessionId;
     if (isNewSession) {
       sessionId = crypto.randomUUID().replace(/-/g, "");
@@ -123,84 +132,99 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, userMessage],
       isGenerating: true,
+      isStreaming: false,
       error: null,
     }));
     get().clearMetadata();
 
+    // Placeholder assistant message shown while retrieval runs
+    const placeholderMessage: ChatMessage = {
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toISOString(),
+      isStreaming: true,
+    };
+
     try {
-      const res = await api.chat({
-        query,
-        session_id: sessionId!,
-        use_web_search: useWebSearch,
-        filter_document_ids: filterDocumentIds,
-      });
-
-      // Save metadata
-      set({
-        currentDecision: res.routing_decision || null,
-        currentTrace: res.routing_trace || [],
-        currentLatency: res.latency_ms || {},
-        currentSources: res.sources || [],
-        currentMemories: res.retrieved_memories || [],
-        currentTokens: {
-          prompt: res.prompt_tokens,
-          completion: res.completion_tokens,
-          total: res.total_tokens,
-          cost: res.cost_usd,
-        },
-      });
-
-      const assistantMessage: ChatMessage = {
-        role: "assistant",
-        content: "",
-        timestamp: new Date().toISOString(),
-        agent_type: res.agent_used,
-        isStreaming: true,
-      };
-
-      set((state) => ({
-        messages: [...state.messages, assistantMessage],
-        isGenerating: false,
-        isStreaming: true,
-      }));
-
-      // Emulate typing animation for a premium SaaS experience
-      const fullContent = res.answer;
-      const words = fullContent.split(/(\s+)/);
-      let index = 0;
-      let displayedText = "";
-
-      const interval = setInterval(() => {
-        if (index < words.length) {
-          displayedText += words[index];
-          index++;
-          set((state) => {
-            const updatedMessages = [...state.messages];
-            if (updatedMessages.length > 0) {
-              updatedMessages[updatedMessages.length - 1] = {
-                ...updatedMessages[updatedMessages.length - 1],
-                content: displayedText,
-              };
-            }
-            return { messages: updatedMessages };
-          });
-        } else {
-          clearInterval(interval);
-          set((state) => {
-            const updatedMessages = [...state.messages];
-            if (updatedMessages.length > 0) {
-              updatedMessages[updatedMessages.length - 1] = {
-                ...updatedMessages[updatedMessages.length - 1],
+      await new Promise<void>((resolve, reject) => {
+        const abortController = api.chatStream(
+          {
+            query,
+            session_id: sessionId!,
+            use_web_search: useWebSearch,
+            filter_document_ids: filterDocumentIds,
+          },
+          // onRouting — retrieval done, first token imminent
+          (routingEvent) => {
+            set((state) => ({
+              messages: [...state.messages, { ...placeholderMessage }],
+              isGenerating: false,
+              isStreaming: true,
+              currentDecision: routingEvent.routing_decision || null,
+              currentTrace: routingEvent.trace || [],
+            }));
+          },
+          // onToken — append each token to the last message
+          (token) => {
+            set((state) => {
+              const msgs = [...state.messages];
+              if (msgs.length > 0) {
+                msgs[msgs.length - 1] = {
+                  ...msgs[msgs.length - 1],
+                  content: msgs[msgs.length - 1].content + token,
+                };
+              }
+              return { messages: msgs };
+            });
+          },
+          // onDone — apply full metadata, mark stream finished
+          (meta) => {
+            set((state) => {
+              const msgs = [...state.messages];
+              if (msgs.length > 0) {
+                msgs[msgs.length - 1] = {
+                  ...msgs[msgs.length - 1],
+                  agent_type: (meta as any).agent_used,
+                  isStreaming: false,
+                };
+              }
+              return {
+                messages: msgs,
                 isStreaming: false,
+                currentDecision: (meta as any).routing_decision || null,
+                currentTrace: (meta as any).routing_trace || [],
+                currentLatency: (meta as any).latency_ms || {},
+                currentSources: (meta as any).sources || [],
+                currentMemories: (meta as any).retrieved_memories || [],
+                currentTokens: {
+                  prompt: (meta as any).prompt_tokens ?? 0,
+                  completion: (meta as any).completion_tokens ?? 0,
+                  total: (meta as any).total_tokens ?? 0,
+                  cost: (meta as any).cost_usd ?? 0,
+                },
               };
-            }
-            return { isStreaming: false };
-          });
-          get().fetchSessions();
-        }
-      }, 15); // Adjust typing speed here
-    } catch (err: any) {
-      set({ error: err.message, isGenerating: false });
+            });
+            get().fetchSessions();
+            resolve();
+          },
+          // onError
+          (errMsg) => {
+            set({ error: errMsg, isGenerating: false, isStreaming: false });
+            reject(new Error(errMsg));
+          },
+        );
+
+        // Attach abort controller for cleanup (e.g., on session change)
+        (get() as any)._streamAbort = abortController;
+      });
+    } catch (err: unknown) {
+      if ((err as { name?: string })?.name !== "AbortError") {
+        set({
+          error: err instanceof Error ? err.message : String(err),
+          isGenerating: false,
+          isStreaming: false,
+        });
+      }
     }
   },
 

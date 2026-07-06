@@ -3,15 +3,20 @@ import { cn } from "@/lib/utils";
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   glass?: boolean;
+  /** Elevated = slightly more opaque glass surface, hovers with lift */
+  elevated?: boolean;
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, glass = false, ...props }, ref) => (
+  ({ className, glass = false, elevated = false, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "rounded-[20px] border border-[#66415C]/20 bg-[#1A171B]/50 backdrop-blur-xl text-white shadow-lg shadow-black/20 transition-all duration-300",
-        glass && "glass-card",
+        "rounded-[20px] transition-all duration-300",
+        // Always apply glass-card (Liquid Glass surface) — glass prop kept for back-compat
+        "glass-card",
+        // Elevated variant: slightly stronger shadow tint
+        elevated && "shadow-[0_20px_60px_rgba(0,0,0,0.50),0_1px_0_rgba(255,255,255,0.12)_inset]",
         className
       )}
       {...props}
@@ -26,7 +31,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    className={cn("flex flex-col space-y-1.5 p-6 relative z-10", className)}
     {...props}
   />
 ));
@@ -63,9 +68,7 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-6 pt-0", className)}
-    {...props}
-  />
+  <div ref={ref} className={cn("p-6 pt-0 relative z-10", className)} {...props} />
 ));
 CardContent.displayName = "CardContent";
 
@@ -75,10 +78,30 @@ const CardFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex items-center p-6 pt-0 border-t border-border/20 mt-4", className)}
+    className={cn(
+      "flex items-center p-6 pt-0 relative z-10",
+      "border-t border-[var(--glass-border)] mt-4",
+      className
+    )}
     {...props}
   />
 ));
 CardFooter.displayName = "CardFooter";
 
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };
+/**
+ * CardSection — an inset glass surface for stat chips, data rows, etc.
+ * Uses the `glass-inset` class for a recessed appearance.
+ */
+const CardSection = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("glass-inset p-3 rounded-xl", className)}
+    {...props}
+  />
+));
+CardSection.displayName = "CardSection";
+
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardSection };

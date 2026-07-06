@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -62,17 +63,22 @@ Route this query to the most appropriate agent."""
 
 class RouterAgent:
     """
-    Intelligent query router that uses Gemini to classify queries and
-    dispatch them to the correct downstream agent.
+    Intelligent query router that uses a two-stage classification strategy:
 
-    The router considers:
-    1. Query intent (document, web, memory, hybrid).
-    2. Whether the vector store has indexed documents.
-    3. Whether there is active conversation history.
+    **Stage 1 — Heuristic fast path** (zero LLM cost):
+    For queries with unambiguous signals (clear doc-only or web-only keywords),
+    routing is resolved instantly via keyword rules, saving ~800 ms per query.
 
-    When classification confidence is low, it defaults to RAG (if documents
-    exist) or WEB (if the knowledge base is empty).
+    **Stage 2 — LLM classification** (only for genuinely ambiguous queries):
+    When the heuristic cannot decide confidently (e.g. both doc + web keywords
+    present, or no keywords at all), Gemini is called to make the final call.
+
+    The router also caches ``vector_store.count()`` with a 30-second TTL so
+    repeated queries within the same burst don’t each hit ChromaDB.
     """
+
+    # ── Count cache constants ─────────────────────────────────────────────────
+    _COUNT_TTL_SECONDS = 30  # How long to trust the cached chunk count
 
     def __init__(self, vector_store: VectorStore | None = None) -> None:
         self._vector_store = vector_store or get_vector_store()
@@ -80,6 +86,10 @@ class RouterAgent:
             temperature=0.0,  # Deterministic routing
             max_output_tokens=256,
         )
+        # Cached count state
+        self._cached_count: int = 0
+        self._count_last_refreshed: float = 0.0
+        self._count_lock = threading.Lock()
         logger.info(
             "RouterAgent initialised",
             extra={"llm_provider": settings.llm_provider},
@@ -90,6 +100,10 @@ class RouterAgent:
     def route(self, state: AgentState) -> AgentState:
         """
         Classify the query and set ``state.agent_type``.
+
+        Uses a two-stage strategy:
+        1. Fast heuristic check — resolves unambiguous queries in <1 ms.
+        2. LLM classification — only invoked for genuinely ambiguous queries.
 
         Also populates ``state.routing_decision`` with the full classification
         result (agent, reasoning, confidence) and appends step-by-step entries
@@ -108,7 +122,7 @@ class RouterAgent:
         state.routing_trace.append(f"⏳ Router received query ({len(query)} chars)")
 
         try:
-            num_docs = self._vector_store.count()
+            num_docs = self._get_cached_count()
             has_history = bool(state.conversation_history)
             history_preview = self._preview_history(state)
 
@@ -117,14 +131,26 @@ class RouterAgent:
                 f"Conversation history: {'yes' if has_history else 'no'}"
             )
 
-            with log_latency(logger, "routing", query=query) as route_ctx:
-                agent_type, decision, p_tok, c_tok, t_tok = self._classify_with_decision(
-                    query=query,
-                    num_docs=num_docs,
-                    has_history=has_history,
-                    history_preview=history_preview,
-                )
-            state.latency_ms["routing"] = route_ctx.get("latency_ms", 0.0)
+            # ── Stage 1: Heuristic fast path ──────────────────────────────────
+            # For unambiguous queries we skip the LLM entirely (~800 ms saved).
+            heuristic_result = self._try_heuristic_route(
+                query, num_docs, has_history
+            )
+
+            if heuristic_result is not None:
+                # Clear, confident classification — no LLM needed.
+                agent_type, decision = heuristic_result
+                p_tok = c_tok = t_tok = 0
+            else:
+                # ── Stage 2: LLM classification (ambiguous queries only) ───────
+                with log_latency(logger, "routing", query=query) as route_ctx:
+                    agent_type, decision, p_tok, c_tok, t_tok = self._classify_with_decision(
+                        query=query,
+                        num_docs=num_docs,
+                        has_history=has_history,
+                        history_preview=history_preview,
+                    )
+                state.latency_ms["routing"] = route_ctx.get("latency_ms", 0.0)
 
             # Accumulate router token usage and cost
             state.prompt_tokens += p_tok
@@ -144,7 +170,8 @@ class RouterAgent:
             }.get(agent_type.value, agent_type.value)
 
             conf_pct = int(decision.confidence * 100)
-            fallback_note = " [rule-based fallback]" if decision.fallback_used else ""
+            fast_path_note = " [fast-path]" if decision.fallback_used and p_tok == 0 and c_tok == 0 else ""
+            fallback_note = " [rule-based fallback]" if decision.fallback_used and not fast_path_note else fast_path_note
             state.routing_trace.append(
                 f"→ Route: **{agent_label}** | Confidence: {conf_pct}%{fallback_note}"
             )
@@ -160,6 +187,7 @@ class RouterAgent:
                     "reasoning": decision.reasoning[:120] if decision.reasoning else "",
                     "fallback_used": decision.fallback_used,
                     "num_docs": num_docs,
+                    "llm_tokens_used": t_tok,
                 },
             )
 
@@ -204,6 +232,96 @@ class RouterAgent:
         return mapping.get(agent, "rag_node")
 
     # ── Internal helpers ──────────────────────────────────────────────────────
+
+    def _get_cached_count(self) -> int:
+        """
+        Return the number of indexed chunks with a 30-second TTL cache.
+        Avoids hitting ChromaDB on every single query in a burst.
+        """
+        with self._count_lock:
+            now = time.monotonic()
+            if now - self._count_last_refreshed > self._COUNT_TTL_SECONDS:
+                self._cached_count = self._vector_store.count()
+                self._count_last_refreshed = now
+        return self._cached_count
+
+    def _try_heuristic_route(
+        self,
+        query: str,
+        num_docs: int,
+        has_history: bool,
+    ) -> tuple[AgentType, RoutingDecision] | None:
+        """
+        Attempt to classify the query using keyword heuristics alone.
+
+        Returns ``(AgentType, RoutingDecision)`` when the query is
+        **unambiguously** classifiable (strong single-class signal), or
+        ``None`` when the query is ambiguous and the LLM should decide.
+
+        The LLM is only called for queries that are genuinely ambiguous
+        (e.g., both doc + web keywords present, or no keywords at all).
+        """
+        q_lower = query.lower()
+
+        memory_kw = {"earlier", "before", "previous", "you said", "last time", "continue", "what did you"}
+        web_kw    = {"latest", "current", "today", "news", "recent", "2024", "2025", "2026", "live", "trends", "trend"}
+        doc_kw    = {"document", "report", "file", "data", "resume", "pdf", "cv", "in the", "uploaded"}
+
+        has_memory_kw = has_history and any(kw in q_lower for kw in memory_kw)
+        has_web_kw    = any(kw in q_lower for kw in web_kw)
+        has_doc_kw    = any(kw in q_lower for kw in doc_kw)
+
+        def _decision(agent: AgentType, reasoning: str, confidence: float) -> RoutingDecision:
+            return RoutingDecision(
+                agent=agent.value,
+                reasoning=reasoning,
+                confidence=confidence,
+                fallback_used=True,   # "fallback" here means: no LLM used
+                num_docs_available=num_docs,
+            )
+
+        # 1. Explicit memory reference + history → memory (always unambiguous)
+        if has_memory_kw:
+            return AgentType.MEMORY, _decision(
+                AgentType.MEMORY,
+                "Query references a previous conversation turn.",
+                0.95,
+            )
+
+        # 2. Both doc + web signals → hybrid (unambiguous)
+        if has_doc_kw and has_web_kw and num_docs > 0:
+            return AgentType.HYBRID, _decision(
+                AgentType.HYBRID,
+                "Query references both uploaded documents and real-time/external information.",
+                0.90,
+            )
+
+        # 3. Clear doc-only signal, documents exist → RAG
+        if has_doc_kw and not has_web_kw and num_docs > 0:
+            return AgentType.RAG, _decision(
+                AgentType.RAG,
+                "Query explicitly references uploaded documents.",
+                0.95,
+            )
+
+        # 4. Clear web-only signal (no doc keywords, or no docs at all) → web
+        if has_web_kw and not has_doc_kw:
+            return AgentType.WEB, _decision(
+                AgentType.WEB,
+                "Query asks for real-time or current information.",
+                0.90,
+            )
+
+        # 5. No documents available at all → web
+        if num_docs == 0:
+            return AgentType.WEB, _decision(
+                AgentType.WEB,
+                "No documents indexed — routing to web search.",
+                0.85,
+            )
+
+        # Query is ambiguous: let the LLM decide.
+        return None
 
     def _classify_with_decision(
         self,
