@@ -47,11 +47,16 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
     try:
         orchestrator = get_orchestrator()
-        result = orchestrator.run(
-            query=request.query,
-            session_id=session_id,
-            use_web_search=request.use_web_search,
-            filter_document_ids=request.filter_document_ids,
+        import asyncio
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: orchestrator.run(
+                query=request.query,
+                session_id=session_id,
+                use_web_search=request.use_web_search,
+                filter_document_ids=request.filter_document_ids,
+            ),
         )
 
         # ── Log detailed retrieval analytics metric ────────────────────────────
@@ -137,7 +142,7 @@ async def list_chat_sessions() -> list[dict]:
     Retrieve metadata (session ID, title, last updated timestamp, message count)
     for all conversation histories saved on disk.
     """
-    from app.utils.memory_manager import get_memory_manager
+    from app.memory.memory_manager import get_memory_manager
     return get_memory_manager().list_sessions()
 
 
@@ -164,7 +169,7 @@ async def export_chat_session(session_id: str, format: str = "json") -> dict:
     Export the conversation history for a session ID.
     Supports format: json (default) or markdown.
     """
-    from app.utils.memory_manager import get_memory_manager
+    from app.memory.memory_manager import get_memory_manager
     memory = get_memory_manager().load_session(session_id)
     if not memory:
         from app.agents.memory_agent import get_memory_agent

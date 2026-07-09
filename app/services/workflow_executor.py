@@ -120,7 +120,7 @@ def _exec_rag(node: WorkflowNodeDef, ctx: dict[str, Any]) -> dict[str, Any]:
 
 def _exec_memory(node: WorkflowNodeDef, ctx: dict[str, Any]) -> dict[str, Any]:
     """Retrieve relevant long-term memories."""
-    from app.rag.memory_store import get_memory_store
+    from app.memory.memory_store import get_memory_store
 
     query  = ctx.get("query", "")
     top_k  = int(node.config.get("top_k", 5))

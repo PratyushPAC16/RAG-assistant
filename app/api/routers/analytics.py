@@ -161,7 +161,7 @@ async def get_extended_analytics() -> dict:
     - Hourly query volume heatmap
     - Session engagement depth
     """
-    from app.rag.memory_store import get_memory_store
+    from app.memory.memory_store import get_memory_store
 
     out: dict = {}
 

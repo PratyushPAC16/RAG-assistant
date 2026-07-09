@@ -180,7 +180,7 @@ def memory_retriever_node(state: dict[str, Any]) -> dict[str, Any]:
     agent_state = _dict_to_state(state)
     agent_state.routing_trace.append("🧠 Long-Term Memory: searching for relevant user preferences and facts…")
     
-    from app.rag.memory_store import get_memory_store
+    from app.memory.memory_store import get_memory_store
     from app.models.schemas import MemoryRecord
     
     store = get_memory_store()
@@ -592,7 +592,7 @@ class AgentOrchestrator:
 
         # ── Trigger Long-Term Memory Extraction ─────────────────────────────────
         if final_state.answer:
-            from app.utils.long_term_memory import extract_and_persist_memory
+            from app.memory.long_term_memory import extract_and_persist_memory
 
             def _safe_extract_memory(sid: str, q: str, ans: str) -> None:
                 try:
@@ -692,7 +692,7 @@ class AgentOrchestrator:
                 agent_type=final_state.agent_type,
                 metadata=metadata,
             )
-            from app.utils.long_term_memory import extract_and_persist_memory
+            from app.memory.long_term_memory import extract_and_persist_memory
 
             def _safe_extract(sid: str, q: str, ans: str) -> None:
                 try:

@@ -137,7 +137,7 @@ class MemoryAgent:
         memory.add_message(role=role, content=content, **kwargs)
         
         # Persist memory to disk
-        from app.utils.memory_manager import get_memory_manager
+        from app.memory.memory_manager import get_memory_manager
         get_memory_manager().save_session(session_id, memory)
         
         logger.debug(
@@ -157,13 +157,13 @@ class MemoryAgent:
         """Clear the memory for a given session (memory & disk)."""
         if session_id in self._sessions:
             del self._sessions[session_id]
-        from app.utils.memory_manager import get_memory_manager
+        from app.memory.memory_manager import get_memory_manager
         get_memory_manager().delete_session(session_id)
         logger.info("Session memory cleared from memory and disk", extra={"session_id": session_id})
 
     def list_sessions(self) -> list[str]:
         """Return all active session IDs from memory and disk."""
-        from app.utils.memory_manager import get_memory_manager
+        from app.memory.memory_manager import get_memory_manager
         disk_sessions = [s["session_id"] for s in get_memory_manager().list_sessions()]
         return list(set(list(self._sessions.keys()) + disk_sessions))
 
@@ -172,7 +172,7 @@ class MemoryAgent:
     def _get_session_memory(self, session_id: str) -> ConversationMemory:
         """Return or initialise a ConversationMemory for the session (loads from disk if available)."""
         if session_id not in self._sessions:
-            from app.utils.memory_manager import get_memory_manager
+            from app.memory.memory_manager import get_memory_manager
             disk_memory = get_memory_manager().load_session(session_id)
             if disk_memory:
                 self._sessions[session_id] = disk_memory

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from fastapi import APIRouter, Depends
 
-from app.rag.memory_store import get_memory_store
+from app.memory.memory_store import get_memory_store
 from app.api.dependencies import _require_api_key
 
 router = APIRouter(tags=["Long-Term Memory"])
